@@ -633,7 +633,7 @@ class AdReportProcessor:
 # -------------------------------------------------------------------
 
 def main():
-    st.set_page_config(page_title="Auto-Merge & Analysis V20.10", layout="wide")
+    st.set_page_config(page_title="Auto-ad-data", layout="wide")
 
     # --- CSS Styles ---
     st.markdown("""
