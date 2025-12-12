@@ -634,8 +634,6 @@ class AdReportProcessor:
 # ==========================================
 # PART 4: Streamlit UI (保持不变)
 # ==========================================
-# --- MOCK CLASS FOR DEMONSTRATION (请在实际项目中替换为您的真实引用) ---
-# 实际代码中请删除此类，并使用: from your_module import AdReportProcessor
 class AdReportProcessor:
     def __init__(self, raw, bench):
         self.raw = raw
@@ -650,9 +648,11 @@ class AdReportProcessor:
         self.doc.save = lambda x: x.write(b"Fake Word Content")
 
     def process_etl(self):
+        import time  # Locally import to prevent NameError if missing globally
         time.sleep(1.5) # Simulate processing time
 
     def generate_report(self):
+        import time  # Locally import to prevent NameError if missing globally
         time.sleep(1.0) # Simulate processing time
 # -------------------------------------------------------------------
 
@@ -662,25 +662,43 @@ def main():
     # --- CSS Styles ---
     st.markdown("""
         <style>
-        /* 1. Main Title Style (Purple) */
+        /* 0. Global Background (Aurora Effect) */
+        .stApp {
+            /* 柔和的极光背景：中心是暖黄色，向外扩散为柔和的粉紫色，最后融入白色背景 */
+            background: radial-gradient(circle at 50% 20%, rgba(255, 240, 200, 0.6) 0%, rgba(240, 200, 255, 0.4) 30%, rgba(255, 255, 255, 1) 70%);
+            background-attachment: fixed;
+            background-size: cover;
+        }
+
+        /* 1. Main Title Style (Gradient) */
         .main-title {
             text-align: center;
-            font-size: 3rem;
-            font-weight: 700;
-            color: #8E44AD; /* Purple color matching the image */
+            font-size: 3.5rem;
+            font-weight: 800;
             margin-bottom: 0.5rem;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            
+            /* Gradient Text Effect - Darker/Richer for better contrast on light bg */
+            background: linear-gradient(135deg, #A239CA 0%, #4717F6 100%);
+            background: -webkit-linear-gradient(135deg, #A239CA 0%, #4717F6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         /* 2. Subtitle Description */
         .sub-title {
             text-align: center;
             font-size: 1.1rem;
-            color: #7F8C8D;
+            color: #666; /* Slightly darker for better readability */
             margin-bottom: 3rem;
         }
 
         /* 3. Card/Container Headers */
+        /* Make cards slightly translucent to blend with background */
+        div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlock"] {
+            /* This selector targets inner containers if needed, but st.container(border=True) handles most */
+        }
+        
         .card-header {
             text-align: center;
             font-weight: 600;
@@ -694,28 +712,32 @@ def main():
             margin-bottom: 10px;
         }
 
-        /* 4. Center the 'Start' button */
+        /* 4. Center the 'Start' button with Gradient */
         div.stButton > button {
             display: block;
             margin: 0 auto;
-            background-color: #2C3E50;
+            /* Gradient Background */
+            background-image: linear-gradient(135deg, #CB5EEE 0%, #4BE1EC 100%);
             color: white;
             border-radius: 25px;
-            padding: 0.5rem 2rem;
-            font-size: 1rem;
+            padding: 0.6rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
             border: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(203, 94, 238, 0.3);
             transition: all 0.3s ease;
         }
         div.stButton > button:hover {
-            background-color: #1a252f;
+            opacity: 0.9;
             transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 6px 20px rgba(203, 94, 238, 0.5);
             color: white;
         }
         
-        /* Hide default uploader file list to make it cleaner (optional) */
-        /* [data-testid='stFileUploader'] section {padding: 1rem;} */
+        /* Optional: Transparent background for containers to show the glow */
+        [data-testid="stForm"] {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -749,6 +771,7 @@ def main():
     # We use columns to center the button visually
     b_c1, b_c2, b_c3 = st.columns([1, 1, 1])
     with b_c2:
+        # Added emoji " ✦" back to button text
         start_btn = st.button("开始生成报告 ✦", use_container_width=True)
 
     # --- Logic ---
