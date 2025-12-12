@@ -636,142 +636,172 @@ class AdReportProcessor:
 def set_artistic_style():
     st.markdown("""
         <style>
-        /* 引入前卫的宽字体 */
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap');
+        /* 引入现代无衬线字体 */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
         
         /* 全局重置 */
         .stApp {
-            background-color: #FAFAFA; /* 极简白背景 */
-            font-family: 'Space Grotesk', sans-serif;
-            color: #1A1A1A;
+            background-color: #FAFBFF; /* 极淡的蓝紫色背景 */
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #2D3748;
         }
         
-        /* 标题样式 - 艺术字效果 */
+        /* 标题样式 - 柔和渐变 */
         h1 {
-            font-size: 3.5rem !important;
+            font-size: 3rem !important;
             font-weight: 800;
-            background: linear-gradient(90deg, #1A1A1A 0%, #4A4A4A 100%);
+            background: linear-gradient(120deg, #845EC2, #D65DB1, #FF6F91);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            letter-spacing: -2px;
+            letter-spacing: -1px;
             margin-bottom: 10px;
+            padding-bottom: 10px;
         }
 
-        /* 装饰性分割线 */
+        /* 装饰性分割线 - 柔光 */
         .art-divider {
-            height: 4px;
-            background: linear-gradient(90deg, #FF005C, #9DFF00, #00D1FF);
-            margin: 20px 0 40px 0;
-            border-radius: 2px;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(132, 94, 194, 0.1), rgba(255, 111, 145, 0.5), rgba(132, 94, 194, 0.1));
+            margin: 20px 0 50px 0;
+            border-radius: 1px;
         }
 
         /* 模块标题 (如 1 数据源输入) */
         .section-header {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #1A1A1A;
-            background-color: #E0E0E0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #4A5568;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
             display: inline-block;
-            padding: 5px 15px;
-            transform: skew(-10deg); /* 倾斜造型 */
+            padding: 8px 16px;
+            border-radius: 20px; /* 大圆角 */
             margin-bottom: 15px;
-            border: 2px solid #1A1A1A;
-            box-shadow: 4px 4px 0px #1A1A1A; /* 硬阴影 */
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
         .section-header span {
             display: inline-block;
-            transform: skew(10deg); /* 文字回正 */
+            background: linear-gradient(120deg, #845EC2, #FF9671);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            margin-right: 8px;
         }
 
-        /* 卡片容器 (功能指南) */
+        /* 卡片容器 (功能指南) - 悬浮玻璃态 */
         .guide-card {
-            background-color: #FFFFFF;
-            border: 2px solid #1A1A1A;
-            padding: 25px;
-            border-radius: 0px; /* 直角 */
+            background: #FFFFFF;
+            border: 1px solid #EDF2F7;
+            padding: 30px;
+            border-radius: 24px; /* 大圆角 */
             position: relative;
-            box-shadow: 8px 8px 0px rgba(0,0,0,1); /* 黑色硬阴影 */
-            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 10px 30px -5px rgba(132, 94, 194, 0.08); /* 柔和紫色阴影 */
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             margin-bottom: 40px;
+            overflow: hidden;
+        }
+        .guide-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 6px;
+            background: linear-gradient(90deg, #845EC2, #D65DB1, #FF9671, #FFC75F);
         }
         .guide-card:hover {
-            transform: translate(-2px, -2px);
-            box-shadow: 12px 12px 0px #9DFF00; /* 悬浮变为荧光绿阴影 */
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -5px rgba(132, 94, 194, 0.15);
         }
         .guide-title {
             font-weight: 700;
-            font-size: 1.2rem;
-            color: #FF005C; /* 荧光粉标题 */
-            margin-bottom: 10px;
-            text-transform: uppercase;
+            font-size: 1.1rem;
+            color: #2D3748;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
         }
 
-        /* 文件上传组件重构 */
+        /* 文件上传组件重构 - 极简白 */
         [data-testid='stFileUploader'] {
-            background-color: #F4F4F4;
-            border: 2px dashed #1A1A1A;
-            border-radius: 0px;
-            padding: 20px;
+            background-color: #FFFFFF;
+            border: 1px dashed #CBD5E0;
+            border-radius: 16px;
+            padding: 25px;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
         [data-testid='stFileUploader']:hover {
-            background-color: #FFFFFF;
-            border-color: #00D1FF; /* 悬浮变为电光蓝 */
-            transform: scale(1.01);
+            border-color: #D65DB1; /* 悬浮变为粉紫色 */
+            background-color: #FDFAFC;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px -10px rgba(214, 93, 177, 0.2);
+        }
+        [data-testid='stFileUploader'] section {
+            padding: 0;
         }
         /* 上传按钮样式覆盖 */
         [data-testid='stFileUploader'] button {
-            border: 2px solid #1A1A1A;
-            color: #1A1A1A;
-            font-weight: bold;
-            border-radius: 0;
-            box-shadow: 2px 2px 0px #1A1A1A;
+            border: 1px solid #E2E8F0;
+            color: #4A5568;
+            font-weight: 500;
+            border-radius: 8px;
+            box-shadow: none;
+            background: white;
         }
 
-        /* 主按钮 (开始处理) - 波普艺术风格 */
+        /* 主按钮 (开始处理) - 强渐变 */
         div.stButton > button:first-child {
-            background-color: #1A1A1A;
-            color: #9DFF00; /* 黑底绿字 */
-            border: 2px solid #1A1A1A;
-            padding: 15px 40px;
-            font-size: 20px;
-            border-radius: 0px;
+            background: linear-gradient(135deg, #845EC2 0%, #D65DB1 100%);
+            color: white;
+            border: none;
+            padding: 16px 40px;
+            font-size: 18px;
+            border-radius: 50px; /* 胶囊形状 */
             width: 100%;
-            font-weight: 800;
-            letter-spacing: 1px;
-            box-shadow: 6px 6px 0px #FF005C; /* 粉色硬阴影 */
-            transition: all 0.2s ease;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            box-shadow: 0 10px 20px -5px rgba(132, 94, 194, 0.4);
+            transition: all 0.3s ease;
         }
         div.stButton > button:first-child:hover {
-            background-color: #FF005C;
-            color: #FFFFFF;
-            box-shadow: 0px 0px 0px #1A1A1A; /* 阴影归零 */
-            transform: translate(6px, 6px); /* 按下效果 */
-            border-color: #FF005C;
+            background: linear-gradient(135deg, #956FD3 0%, #E76EC2 100%);
+            box-shadow: 0 15px 30px -5px rgba(132, 94, 194, 0.5);
+            transform: translateY(-3px) scale(1.02);
+        }
+        div.stButton > button:first-child:active {
+            transform: translateY(1px);
         }
 
-        /* 下载按钮群 - 极简线框 */
+        /* 下载按钮群 - 柔和卡片风格 */
         [data-testid="stDownloadButton"] button {
-            background-color: transparent;
-            color: #1A1A1A;
-            border: 2px solid #1A1A1A;
-            border-radius: 0px;
+            background-color: #FFFFFF;
+            color: #4A5568;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
             font-weight: 600;
-            box-shadow: 4px 4px 0px #E0E0E0;
-            transition: all 0.2s;
+            padding: 10px 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.3s;
         }
         [data-testid="stDownloadButton"] button:hover {
-            background-color: #1A1A1A;
-            color: #FFFFFF;
-            box-shadow: 4px 4px 0px #00D1FF;
+            background: linear-gradient(135deg, #FF9671 0%, #FFC75F 100%);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 8px 15px -3px rgba(255, 150, 113, 0.4);
             transform: translateY(-2px);
         }
 
         /* 状态提示框美化 */
         .stAlert {
-            border: 2px solid #1A1A1A;
-            border-radius: 0;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
+            background-color: #FFFFFF;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            border-left: 4px solid #845EC2;
+        }
+        
+        /* 进度条颜色 */
+        .stProgress > div > div > div > div {
+            background: linear-gradient(90deg, #845EC2, #D65DB1, #FF9671);
         }
         </style>
     """, unsafe_allow_html=True)
