@@ -175,19 +175,53 @@ def calc_metrics_dict(df_chunk):
         else:
              sums[t] = 0.0
 
-    eps = 1e-9
+# 1. 定义一个安全的除法函数 (核心优化)
+def safe_div(numerator, denominator, multiplier=1.0):
+    """
+    安全除法：
+    - 如果分母 > 0，执行除法并乘以系数 (如CPM需乘1000)
+    - 如果分母 <= 0 (或为None/0)，返回 0.0
+    """
+    try:
+        n = float(numerator)
+        d = float(denominator)
+        if d > 0:
+            return (n / d) * multiplier
+        else:
+            return 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+    # 2. 应用优化后的公式
+    # 直接调用 safe_div，再也不用担心 eps 产生的异常值
     res['spend'] = sums['spend']
-    res['roas'] = sums['purchase_value'] / (sums['spend'] + eps)
-    res['cpm'] = (sums['spend'] / (sums['impressions'] + eps)) * 1000
-    res['cpc'] = sums['spend'] / (sums['clicks'] + eps)
-    res['ctr'] = sums['clicks'] / (sums['impressions'] + eps)
-    res['cpa'] = sums['spend'] / (sums['purchases'] + eps) 
-    res['cvr_purchase'] = sums['purchases'] / (sums['clicks'] + eps)
-    res['rate_click_to_lp'] = sums['landing_page_views'] / (sums['clicks'] + eps)
-    res['rate_lp_to_atc'] = sums['add_to_cart'] / (sums['landing_page_views'] + eps)
-    res['rate_atc_to_ic'] = sums['initiate_checkout'] / (sums['add_to_cart'] + eps)
-    res['rate_ic_to_pur'] = sums['purchases'] / (sums['initiate_checkout'] + eps)
-    res['aov'] = sums['purchase_value'] / (sums['purchases'] + eps)
+
+    # ROAS: 收入 / 花费
+    res['roas'] = safe_div(sums['purchase_value'], sums['spend'])
+
+    # CPM: (花费 / 展示) * 1000  -> multiplier=1000
+    res['cpm'] = safe_div(sums['spend'], sums['impressions'], multiplier=1000)
+
+    # CPC: 花费 / 点击
+    res['cpc'] = safe_div(sums['spend'], sums['clicks'])
+
+    # CTR: 点击 / 展示
+    res['ctr'] = safe_div(sums['clicks'], sums['impressions'])
+
+    # CPA: 花费 / 购买数 (这里解决了你的大异常值问题)
+    res['cpa'] = safe_div(sums['spend'], sums['purchases'])
+
+    # CVR: 购买数 / 点击
+    res['cvr_purchase'] = safe_div(sums['purchases'], sums['clicks'])
+
+    # 漏斗转化率系列
+    res['rate_click_to_lp'] = safe_div(sums['landing_page_views'], sums['clicks'])
+    res['rate_lp_to_atc']   = safe_div(sums['add_to_cart'], sums['landing_page_views'])
+    res['rate_atc_to_ic']   = safe_div(sums['initiate_checkout'], sums['add_to_cart'])
+    res['rate_ic_to_pur']   = safe_div(sums['purchases'], sums['initiate_checkout'])
+
+    # AOV: 收入 / 购买数
+    res['aov'] = safe_div(sums['purchase_value'], sums['purchases'])
 
     # 辅助信息
     date_col = find_column_fuzzy(df_chunk, ['date', 'time', 'range'])
