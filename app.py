@@ -633,289 +633,250 @@ class AdReportProcessor:
 # ==========================================
 # PART 4: Streamlit UI (保持不变)
 # ==========================================
-def set_design_style():
+def set_artistic_style():
     st.markdown("""
         <style>
-        /* 全局字体与背景 */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+        /* 引入前卫的宽字体 */
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap');
         
+        /* 全局重置 */
         .stApp {
-            background-color: #F8F9FA; /* 极浅灰背景，突出主体 */
-            font-family: 'Inter', sans-serif;
+            background-color: #FAFAFA; /* 极简白背景 */
+            font-family: 'Space Grotesk', sans-serif;
+            color: #1A1A1A;
         }
-
-        /* 标题样式 */
+        
+        /* 标题样式 - 艺术字效果 */
         h1 {
-            color: #0F172A;
+            font-size: 3.5rem !important;
+            font-weight: 800;
+            background: linear-gradient(90deg, #1A1A1A 0%, #4A4A4A 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -2px;
+            margin-bottom: 10px;
+        }
+
+        /* 装饰性分割线 */
+        .art-divider {
+            height: 4px;
+            background: linear-gradient(90deg, #FF005C, #9DFF00, #00D1FF);
+            margin: 20px 0 40px 0;
+            border-radius: 2px;
+        }
+
+        /* 模块标题 (如 1 数据源输入) */
+        .section-header {
+            font-size: 1.5rem;
             font-weight: 700;
-            letter-spacing: -1px;
-            padding-bottom: 20px;
+            color: #1A1A1A;
+            background-color: #E0E0E0;
+            display: inline-block;
+            padding: 5px 15px;
+            transform: skew(-10deg); /* 倾斜造型 */
+            margin-bottom: 15px;
+            border: 2px solid #1A1A1A;
+            box-shadow: 4px 4px 0px #1A1A1A; /* 硬阴影 */
+        }
+        .section-header span {
+            display: inline-block;
+            transform: skew(10deg); /* 文字回正 */
         }
 
-        /* 说明卡片样式 */
-        .info-card {
+        /* 卡片容器 (功能指南) */
+        .guide-card {
             background-color: #FFFFFF;
-            border-left: 5px solid #0056B3; /* 商务蓝 */
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 30px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 2px solid #1A1A1A;
+            padding: 25px;
+            border-radius: 0px; /* 直角 */
+            position: relative;
+            box-shadow: 8px 8px 0px rgba(0,0,0,1); /* 黑色硬阴影 */
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            margin-bottom: 40px;
         }
-        .info-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+        .guide-card:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 12px 12px 0px #9DFF00; /* 悬浮变为荧光绿阴影 */
         }
-        .info-title {
-            color: #0056B3;
-            font-weight: 600;
-            font-size: 1.1rem;
-            margin-bottom: 8px;
-        }
-        .info-text {
-            color: #475569;
-            font-size: 0.95rem;
-            line-height: 1.6;
+        .guide-title {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #FF005C; /* 荧光粉标题 */
+            margin-bottom: 10px;
+            text-transform: uppercase;
         }
 
-        /* 文件上传组件美化 */
+        /* 文件上传组件重构 */
         [data-testid='stFileUploader'] {
-            background-color: #FFFFFF;
-            border-radius: 12px;
+            background-color: #F4F4F4;
+            border: 2px dashed #1A1A1A;
+            border-radius: 0px;
             padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             transition: all 0.3s ease;
-            border: 1px solid #E2E8F0;
         }
         [data-testid='stFileUploader']:hover {
-            border-color: #0056B3;
-            box-shadow: 0 8px 16px rgba(0,86,179,0.1);
+            background-color: #FFFFFF;
+            border-color: #00D1FF; /* 悬浮变为电光蓝 */
+            transform: scale(1.01);
         }
-        
-        /* 按钮通用动效 */
-        button {
-            transition: all 0.3s ease !important;
+        /* 上传按钮样式覆盖 */
+        [data-testid='stFileUploader'] button {
+            border: 2px solid #1A1A1A;
+            color: #1A1A1A;
+            font-weight: bold;
+            border-radius: 0;
+            box-shadow: 2px 2px 0px #1A1A1A;
         }
 
-        /* "开始处理" 主按钮样式 (Primary) */
+        /* 主按钮 (开始处理) - 波普艺术风格 */
         div.stButton > button:first-child {
-            background: linear-gradient(135deg, #0056B3 0%, #004494 100%);
-            color: white;
-            border: none;
-            padding: 12px 32px;
-            font-size: 18px;
-            border-radius: 8px;
+            background-color: #1A1A1A;
+            color: #9DFF00; /* 黑底绿字 */
+            border: 2px solid #1A1A1A;
+            padding: 15px 40px;
+            font-size: 20px;
+            border-radius: 0px;
             width: 100%;
-            font-weight: 600;
-            box-shadow: 0 4px 6px rgba(0, 86, 179, 0.2);
+            font-weight: 800;
+            letter-spacing: 1px;
+            box-shadow: 6px 6px 0px #FF005C; /* 粉色硬阴影 */
+            transition: all 0.2s ease;
         }
         div.stButton > button:first-child:hover {
-            background: linear-gradient(135deg, #0062cc 0%, #0050aa 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(0, 86, 179, 0.3);
-        }
-        div.stButton > button:first-child:active {
-            transform: translateY(1px);
+            background-color: #FF005C;
+            color: #FFFFFF;
+            box-shadow: 0px 0px 0px #1A1A1A; /* 阴影归零 */
+            transform: translate(6px, 6px); /* 按下效果 */
+            border-color: #FF005C;
         }
 
-        /* 下载按钮样式 (Secondary) */
+        /* 下载按钮群 - 极简线框 */
         [data-testid="stDownloadButton"] button {
-            background-color: #FFFFFF;
-            color: #0056B3;
-            border: 1px solid #0056B3;
-            border-radius: 6px;
+            background-color: transparent;
+            color: #1A1A1A;
+            border: 2px solid #1A1A1A;
+            border-radius: 0px;
+            font-weight: 600;
+            box-shadow: 4px 4px 0px #E0E0E0;
+            transition: all 0.2s;
         }
         [data-testid="stDownloadButton"] button:hover {
-            background-color: #F0F7FF;
-            color: #003366;
-            border-color: #003366;
+            background-color: #1A1A1A;
+            color: #FFFFFF;
+            box-shadow: 4px 4px 0px #00D1FF;
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
-        /* 进度条颜色 */
-        .stProgress > div > div > div > div {
-            background-color: #0056B3;
+        /* 状态提示框美化 */
+        .stAlert {
+            border: 2px solid #1A1A1A;
+            border-radius: 0;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
         }
         </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🧩 Mock Class (模拟后端逻辑，请替换为真实类)
+# 🧩 Mock Logic (逻辑层)
 # ==========================================
-class MockAdReportProcessor:
-    """
-    这是一个占位符类，用于模拟数据处理过程。
-    请在实际部署时移除此类，并导入您真实的 AdReportProcessor。
-    """
-    def __init__(self, raw_file, bench_file):
-        self.raw_file = raw_file
-        self.bench_file = bench_file
+class MockProcessor:
+    def __init__(self, raw, bench):
+        self.raw = raw
+        self.bench = bench
         self.merged_dfs = {}
         self.final_json = {}
-        # 模拟 Word 文档对象
         class MockDoc:
-            def save(self, buffer):
-                buffer.write(b"Mock Word Content")
+            def save(self, b): b.write(b"content")
         self.doc = MockDoc()
 
-    def process_etl(self):
-        time.sleep(1.5) # 模拟耗时
-        # 创建假数据用于展示
-        data = {'Campaign': ['Camp_A', 'Camp_B', 'Camp_C'], 'Cost': [1000, 2000, 1500], 'ROAS': [1.5, 2.0, 1.2]}
-        self.merged_dfs = {
-            "Master_Sheet": pd.DataFrame(data),
-            "Channel_Breakdown": pd.DataFrame(data)
-        }
-
-    def generate_report(self):
-        time.sleep(1.5) # 模拟耗时
-        self.final_json = {
-            "summary": "This is a generated analysis.",
-            "metrics": {"total_spend": 4500, "avg_roas": 1.57}
-        }
+    def run_pipeline(self):
+        time.sleep(1.5)
+        self.merged_dfs = {"Overview": pd.DataFrame({'A': [1,2], 'B': [3,4]})}
+        self.final_json = {"status": "success", "score": 98}
 
 # ==========================================
-# 🚀 主程序逻辑
+# 🚀 主程序
 # ==========================================
 def main():
-    st.set_page_config(page_title="Auto-Merge & Analysis V20.10", layout="wide", page_icon="📊")
-    set_design_style() # 注入自定义 CSS
+    st.set_page_config(page_title="Ad-Opt System", layout="wide", page_icon="🎨")
+    set_artistic_style()
 
     # --- Header ---
-    st.title("📊 广告优化报告数据生产系统")
-    st.markdown("---")
+    c1, c2 = st.columns([0.1, 0.9])
+    with c1:
+        # 使用 emoji 模拟图标，放大处理
+        st.markdown("<div style='font-size: 3.5rem; line-height: 1.2;'>📊</div>", unsafe_allow_html=True)
+    with c2:
+        st.title("广告优化报告数据生产系统")
+    
+    # 艺术分割线
+    st.markdown('<div class="art-divider"></div>', unsafe_allow_html=True)
 
-    # --- 功能说明区 (自定义 HTML 卡片) ---
+    # --- Guide Section (自定义 HTML 结构) ---
     st.markdown("""
-        <div class="info-card">
-            <div class="info-title">💡 功能使用指南</div>
-            <div class="info-text">
-                1. 请上传 <b>[周期性复盘报告]</b> 与 <b>[行业 Benchmark]</b> 两个数据源文件。<br>
-                2. 系统将自动进行数据清洗、ETL 处理及大模型分析架构生成。<br>
-                3. 输出包含：<b>JSON</b> (AI分析用)、<b>Excel</b> (透视用)、<b>Word</b> (审查用)。
-            </div>
+        <div class="guide-card">
+            <div class="guide-title">⚡ 功能使用指南 / USER GUIDE</div>
+            <ul style="list-style-type: square; padding-left: 20px; color: #444; font-family: monospace;">
+                <li style="margin-bottom: 8px;">请上传 <strong>[周期性复盘报告]</strong> 与 <strong>[行业 Benchmark]</strong> 源文件。</li>
+                <li style="margin-bottom: 8px;">系统将自动执行：数据清洗 -> ETL处理 -> 大模型架构生成。</li>
+                <li>输出包含：JSON (AI分析用)、Excel (透视用)、Word (审查用)。</li>
+            </ul>
         </div>
     """, unsafe_allow_html=True)
 
-    # --- 文件上传区 ---
+    # --- Input Section ---
     col1, col2 = st.columns(2, gap="large")
-    
+
     with col1:
-        st.markdown("### 1️⃣ 数据源输入")
-        raw_file = st.file_uploader("上传 [数据报表] (Excel)", type=["xlsx", "xls"], key="raw")
-        if raw_file:
-            st.success(f"已就绪: {raw_file.name}")
+        st.markdown('<div class="section-header"><span>1️⃣ 数据源输入</span></div>', unsafe_allow_html=True)
+        f1 = st.file_uploader("上传 [数据报表] (Excel)", type=["xlsx", "xls"], key="f1")
+        if f1:
+            st.markdown(f"<div style='color:#00D1FF; font-weight:bold; margin-top:5px;'>✔ 已加载: {f1.name}</div>", unsafe_allow_html=True)
         else:
-            st.info("等待上传...")
+            st.markdown("<div style='color:#999; font-size:0.8rem; margin-top:5px;'>等待上传...</div>", unsafe_allow_html=True)
 
     with col2:
-        st.markdown("### 2️⃣ 行业基准")
-        bench_file = st.file_uploader("上传 [行业 Benchmark]", type=["xlsx", "xls"], key="bench")
-        if bench_file:
-            st.success(f"已就绪: {bench_file.name}")
+        st.markdown('<div class="section-header"><span>2️⃣ 行业基准</span></div>', unsafe_allow_html=True)
+        f2 = st.file_uploader("上传 [行业 Benchmark]", type=["xlsx", "xls"], key="f2")
+        if f2:
+            st.markdown(f"<div style='color:#00D1FF; font-weight:bold; margin-top:5px;'>✔ 已加载: {f2.name}</div>", unsafe_allow_html=True)
         else:
-            st.caption("可选 (若无则使用默认基准)")
+            st.markdown("<div style='color:#999; font-size:0.8rem; margin-top:5px;'>可选 (若无则使用默认基准)</div>", unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True) # 增加间距
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # --- 操作按钮 ---
-    # 使用 columns 将按钮居中，并控制宽度
-    _, btn_col, _ = st.columns([1, 2, 1])
+    # --- Action Area ---
+    # 居中布局
+    _, btn_col, _ = st.columns([1, 1.5, 1])
     with btn_col:
-        start_btn = st.button("🚀 开始处理数据")
+        start = st.button("🚀 开始处理数据 / START PROCESS")
 
-    # --- 处理逻辑 ---
-    if start_btn:
-        if not raw_file:
-            st.error("⚠️ 请至少上传 [数据报表] 才能继续！")
-            return
-
-        # 实例化处理器 (此处使用 Mock 类，请替换为真实类)
-        # processor = AdReportProcessor(raw_file, bench_file) 
-        processor = MockAdReportProcessor(raw_file, bench_file)
-
-        # 进度容器
-        progress_placeholder = st.empty()
-        
-        try:
-            # 阶段 1
-            with st.spinner("🔄 正在进行 ETL 清洗与降维合并..."):
-                processor.process_etl()
-                time.sleep(0.5) # UI 体验优化
+    # --- Processing ---
+    if start:
+        if not f1:
+            st.error("⚠️ 缺少核心数据源！MISSING DATA SOURCE")
+        else:
+            processor = MockProcessor(f1, f2)
             
-            st.toast("✅ Master Tables 数据清洗完成!", icon="✨")
+            # 自定义进度条容器
+            with st.status("🔮 正在进行数据炼金术...", expanded=True) as status:
+                st.write("✨ 清洗脏数据...")
+                time.sleep(0.8)
+                st.write("🔥 融合基准指标...")
+                time.sleep(0.8)
+                processor.run_pipeline()
+                status.update(label="✅ 处理完成 / COMPLETED", state="complete", expanded=False)
 
-            # 阶段 1 结果展示
-            with st.expander("🔎 展开查看中间态数据 (Master Tables)", expanded=False):
-                if processor.merged_dfs:
-                    tabs = st.tabs(list(processor.merged_dfs.keys()))
-                    for i, (k, v) in enumerate(processor.merged_dfs.items()):
-                        with tabs[i]:
-                            st.dataframe(v.head(20), use_container_width=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown('<div class="section-header"><span>3️⃣ 结果下载 / DOWNLOAD</span></div>', unsafe_allow_html=True)
 
-            # 阶段 2
-            with st.spinner("🤖 正在生成架构诊断与最终报告..."):
-                processor.generate_report()
-                time.sleep(0.5)
-
-            st.balloons()
-            st.success("✅ 全流程处理完毕，报告已生成！")
-
-            st.divider()
-
-            # --- 下载区域 ---
-            st.markdown("### 📥 结果下载")
-            
-            dc1, dc2, dc3 = st.columns(3, gap="medium")
-            
-            # 1. JSON 下载
-            with dc1:
-                json_str = json.dumps(processor.final_json, indent=4, ensure_ascii=False)
-                st.download_button(
-                    label="📄 下载 JSON\n(AI分析专用)",
-                    data=json_str,
-                    file_name="Ad_Report_Data.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-
-            # 2. Excel 下载
-            with dc2:
-                output_xls = io.BytesIO()
-                with pd.ExcelWriter(output_xls, engine='xlsxwriter') as writer:
-                    for name, df in processor.merged_dfs.items():
-                        df.to_excel(writer, sheet_name=name, index=False)
-                st.download_button(
-                    label="📊 下载 Excel\n(数据透视源)",
-                    data=output_xls.getvalue(),
-                    file_name="Merged_Ad_Report_Final.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-
-            # 3. Word 下载
-            with dc3:
-                output_doc = io.BytesIO()
-                processor.doc.save(output_doc)
-                st.download_button(
-                    label="📝 下载 Word\n(人工审查)",
-                    data=output_doc.getvalue(),
-                    file_name="Ad_Report_Final.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
-                )
-            
-            # 底部提示
-            st.markdown("""
-                <div style='text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 20px;'>
-                    遇到问题？请联系 Keyi 获取技术支持
-                </div>
-            """, unsafe_allow_html=True)
-
-        except Exception as e:
-            st.error("🚫 处理过程中发生错误")
-            st.exception(e)
+            d1, d2, d3 = st.columns(3, gap="medium")
+            with d1:
+                st.download_button("💾 下载 JSON", data="{}", file_name="data.json", use_container_width=True)
+            with d2:
+                st.download_button("📊 下载 Excel", data=b"xls", file_name="data.xlsx", use_container_width=True)
+            with d3:
+                st.download_button("📝 下载 Word", data=b"doc", file_name="report.docx", use_container_width=True)
 
 if __name__ == "__main__":
     main()
