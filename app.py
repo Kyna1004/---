@@ -12,24 +12,24 @@ from docx.oxml.ns import qn
 import docx.opc.constants
 
 # ==========================================
-# PART 1: 配置区域
+# PART 1: 配置区域 (修复了字段映射)
 # ==========================================
 
-# 定义一个「标准字段名→原始表中可能出现的列名」
 COMMON_METRICS = {
-    "spend": ["花费金额(USD)", "花费金额 （USD）", "花费金额 (USD)", "花费金额"],
-    "roas": ["广告花费回报 (ROAS) - 购物", "广告花费回报（ROAS）-购物", "ROAS"],
-    "purchases": ["购买次数", "成效数量", "成效"],
-    "cpa": ["单次购买费用", "单次购物成本", "单次成效成本", "单次成效费用"],
-    "ctr": ["链接点击率", "链接点击率（%)", "链接点击率（%）"],
+    "spend": ["花费金额(USD)", "花费金额 （USD）", "花费金额 (USD)", "花费金额", "Amount Spent"],
+    "roas": ["广告花费回报 (ROAS) - 购物", "广告花费回报（ROAS）-购物", "ROAS", "Purchase ROAS"],
+    "purchases": ["购买次数", "成效数量", "成效", "Purchases"],
+    "cpa": ["单次购买费用", "单次购物成本", "单次成效成本", "单次成效费用", "Cost per Purchase"],
+    "ctr": ["链接点击率", "链接点击率（%)", "链接点击率（%）", "CTR"],
     "cpm": ["千次展示费用", "CPM"],
-    "clicks": ["点击", "链接点击"],
-    "impressions": ["曝光", "展示次数"],
-    "purchase_value": ["购买价值", "购物价值"],
+    "clicks": ["点击", "链接点击", "Clicks"],
+    "impressions": ["曝光", "展示次数", "Impressions"],
+    "purchase_value": ["购买价值", "购物价值", "Purchase Value"],
     "aov": ["单次购买价值", "单次购物价值"]
 }
 
 # 框定「每一个 Sheet」需要抽取哪些指标
+# ✅ 修复：在"受众组"中增加了 converting_countries/genders/ages 映射
 SHEET_MAPPINGS = {
     "整体数据": {
         **COMMON_METRICS,
@@ -61,9 +61,13 @@ SHEET_MAPPINGS = {
     "广告架构": {**COMMON_METRICS, "dimension_item": ["广告类型"]},
     "受众组": {
         **COMMON_METRICS,
-        "dimension_item": ["广告组", "广告组Id"],
-        "custom_audience_settings": ["设置的自定义受众"],
-        "converting_keywords": ["产生成效的关键词"]
+        "dimension_item": ["广告组", "广告组Id", "Ad Set Name"],
+        "custom_audience_settings": ["设置的自定义受众", "Custom Audiences"],
+        "converting_keywords": ["产生成效的关键词", "Interests", "Keywords"],
+        # ✅ 新增以下三行，确保从Excel中读取这些列
+        "converting_countries": ["产生成效的国家", "国家", "地区", "Country", "Region", "Location"],
+        "converting_genders": ["产生成效的性别", "性别", "Gender"],
+        "converting_ages": ["产生成效的年龄", "年龄", "Age", "Age Group"]
     },
     "受众类型": {**COMMON_METRICS, "dimension_item": ["受众类型"]},
     "国家": {**COMMON_METRICS, "dimension_item": ["国家/地区", "国家"]},
@@ -83,14 +87,12 @@ SHEET_MAPPINGS = {
     }
 }
 
-# 降维数据表的结构
 GROUP_CONFIG = {
     "Master_Overview": ["整体数据", "分时段数据", "异常指标"],
     "Master_Breakdown": ["广告架构", "受众组", "受众类型", "国家", "年龄", "性别", "平台&版位"],
     "Master_Creative": ["素材", "落地页"]
 }
 
-# 字段的展示名称
 REPORT_MAPPING = {
     "spend": "花费 ($)", "roas": "ROAS", "purchases": "购买次数", "purchase_value": "购买总价值",
     "cpa": "CPA ($)", "ctr": "CTR (%)", "cpm": "CPM ($)", "aov": "客单价",
@@ -106,10 +108,10 @@ REPORT_MAPPING = {
     "converting_countries": "产生成效的国家", "converting_genders": "产生成效的性别", "converting_ages": "产生成效的年龄"
 }
 
-# 用于模糊识别字段（防止列名不规范）
+# ✅ 增强了模糊匹配别名
 FIELD_ALIASES = {
     "adset_id": ["adset_id", "ad set id", "adset id", "广告组编号", "广告组id", "adset_name", "ad set name"],
-    "converting_countries": ["converting_countries", "country", "region", "国家", "地区"],
+    "converting_countries": ["converting_countries", "country", "region", "国家", "地区", "location"],
     "converting_genders": ["converting_genders", "gender", "性别"],
     "converting_ages": ["converting_ages", "age", "年龄", "age_group"],
     "converting_keywords": ["converting_keywords", "keywords", "interests", "兴趣", "关键词"],
@@ -124,37 +126,21 @@ FIELD_ALIASES = {
 
 
 # ==========================================
-# PART 2: 核心工具函数
+# PART 2: 核心工具函数 (保持不变，略)
 # ==========================================
 
+# ... (保持 parse_float, safe_div, clean_numeric, clean_numeric_strict 等函数不变) ...
 def parse_float(value):
-    """辅助函数：清理数据并将字符串/数字安全转换为浮点数"""
-    if value is None:
-        return 0.0
+    if value is None: return 0.0
     try:
-        # 如果已经是数字，直接返回
-        if isinstance(value, (int, float)):
-            return float(value)
-        # 如果是字符串，去除逗号和空格后再转换
+        if isinstance(value, (int, float)): return float(value)
         return float(str(value).replace(',', '').strip())
-    except (ValueError, TypeError):
-        return 0.0
+    except: return 0.0
 
 def safe_div(numerator, denominator, multiplier=1.0):
-    """
-    安全除法：
-    - 自动清理字符串中的逗号
-    - 分母为0或无效时返回 0.0
-    """
-    n = parse_float(numerator)
-    d = parse_float(denominator)
-    
-    if d > 0:
-        return (n / d) * multiplier
-    else:
-        return 0.0
+    n, d = parse_float(numerator), parse_float(denominator)
+    return (n / d) * multiplier if d > 0 else 0.0
 
-# 宽松清洗（用于展示）
 def clean_numeric(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -163,15 +149,13 @@ def clean_numeric(val):
     try: return float(val_str)
     except: return val
 
-# 严格清洗（用于计算）
-def clean_numeric_strict(val): 
+def clean_numeric_strict(val):
     if pd.isna(val): return 0.0
     val_str = str(val).strip().replace('$', '').replace('¥', '').replace(',', '')
     if '%' in val_str: val_str = val_str.replace('%', '')
     try: return float(val_str)
     except: return 0.0
 
-# 字段鲁棒核心
 def find_column_fuzzy(df, keywords):
     for kw in keywords:
         if kw in df.columns: return kw
@@ -185,64 +169,36 @@ def find_column_fuzzy(df, keywords):
             if kw.lower() in col_lower: return col
     return None
 
-# 核心指标计算
 def calc_metrics_dict(df_chunk):
     res = {}
     if df_chunk.empty: return res
     sums = {}
     targets = ['spend', 'clicks', 'impressions', 'purchases', 'purchase_value',
                'landing_page_views', 'add_to_cart', 'initiate_checkout']
-    
     for t in targets:
         aliases = FIELD_ALIASES.get(t, [t])
         if t == 'purchase_value' and 'value' not in aliases: aliases.append('value')
         col = find_column_fuzzy(df_chunk, aliases)
-        # 使用严格清洗进行计算
-        if col:
-             sums[t] = df_chunk[col].apply(clean_numeric_strict).sum()
-        else:
-             sums[t] = 0.0
+        if col: sums[t] = df_chunk[col].apply(clean_numeric_strict).sum()
+        else: sums[t] = 0.0
 
-    # --- 应用计算逻辑 ---
-
-    # 1. 基础指标 (这里必须转为float，修复之前的报错)
     res['spend'] = parse_float(sums.get('spend', 0))
     res['impressions'] = parse_float(sums.get('impressions', 0))
     res['clicks'] = parse_float(sums.get('clicks', 0))
     res['purchases'] = parse_float(sums.get('purchases', 0))
     res['purchase_value'] = parse_float(sums.get('purchase_value', 0))
-
-    # 2. 计算衍生指标 (直接调用 safe_div，无需再担心类型或除零)
-
-    # ROAS: 收入 / 花费
     res['roas'] = safe_div(sums.get('purchase_value'), sums.get('spend'))
-
-    # CPM: (花费 / 展示) * 1000
     res['cpm'] = safe_div(sums.get('spend'), sums.get('impressions'), multiplier=1000)
-
-    # CPC: 花费 / 点击
     res['cpc'] = safe_div(sums.get('spend'), sums.get('clicks'))
-
-    # CTR: 点击 / 展示 (结果是小数，如 0.015)
     res['ctr'] = safe_div(sums.get('clicks'), sums.get('impressions'))
-
-    # CPA: 花费 / 购买数 (解决了异常值问题)
     res['cpa'] = safe_div(sums.get('spend'), sums.get('purchases'))
-
-    # CVR: 购买数 / 点击
     res['cvr_purchase'] = safe_div(sums.get('purchases'), sums.get('clicks'))
-
-    # 3. 漏斗转化率系列
-    # 使用 .get() 防止字典中缺少某个键导致报错
     res['rate_click_to_lp'] = safe_div(sums.get('landing_page_views'), sums.get('clicks'))
     res['rate_lp_to_atc']   = safe_div(sums.get('add_to_cart'), sums.get('landing_page_views'))
     res['rate_atc_to_ic']   = safe_div(sums.get('initiate_checkout'), sums.get('add_to_cart'))
     res['rate_ic_to_pur']   = safe_div(sums.get('purchases'), sums.get('initiate_checkout'))
-
-    # AOV: 收入 / 购买数
     res['aov'] = safe_div(sums.get('purchase_value'), sums.get('purchases'))
 
-    # 辅助信息: 时间范围
     date_col = find_column_fuzzy(df_chunk, ['date', 'time', 'range'])
     if date_col:
         try:
@@ -251,8 +207,7 @@ def calc_metrics_dict(df_chunk):
             else: res['date_range'] = "-"
         except: res['date_range'] = "-"
     else: res['date_range'] = "-"
-    
-    return res  # ✅ 关键修复：确保有返回值，否则会报 NoneType error
+    return res
 
 def format_cell(key, val, is_mom=False):
     if isinstance(val, str): return val
@@ -282,7 +237,6 @@ def extract_benchmark_values(df_bench):
             except: pass
     return extracted
 
-# 超链接
 def add_hyperlink(paragraph, url, text, color="0000FF", underline=True):
     try:
         part = paragraph.part
@@ -317,31 +271,25 @@ def add_df_to_word(doc, df, title, level=1):
     doc.add_heading(title, level=level)
     t = doc.add_table(rows=df.shape[0]+1, cols=df.shape[1])
     t.style = 'Table Grid'
-
     is_creative = "素材" in title
     is_landing = "落地页" in title
     link_col_idx = -1
-
     for j, col in enumerate(df.columns):
         cell = t.cell(0, j)
         cell.text = str(col)
-        if any(x in str(col).lower() for x in ["url", "link", "素材", "内容", "content"]):
-            link_col_idx = j
+        if any(x in str(col).lower() for x in ["url", "link", "素材", "内容", "content"]): link_col_idx = j
         for p in cell.paragraphs:
             for r in p.runs:
                 r.font.bold = True
                 r.font.size = Pt(8)
-
     for i in range(df.shape[0]):
         label_prefix = "素材" if is_creative else ("落地页" if is_landing else "")
         label_char = chr(65 + (i % 26))
         if i >= 26: label_char += str(i // 26)
         label_text = f"{label_prefix}{label_char}"
-
         for j in range(df.shape[1]):
             val = df.iat[i, j]
             cell = t.cell(i+1, j)
-
             if (is_creative or is_landing) and j == link_col_idx:
                 try:
                     p = cell.paragraphs[0]
@@ -354,64 +302,61 @@ def add_df_to_word(doc, df, title, level=1):
                 if "结论" in str(df.columns[j]):
                     if "✅" in str(val): cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(0, 128, 0)
                     if "⚠️" in str(val): cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 0, 0)
-
             for p in cell.paragraphs:
                 for r in p.runs: r.font.size = Pt(8)
     doc.add_paragraph("\n")
 
 # ==========================================
-# PART 3: 主逻辑类
+# PART 3: 主逻辑类 (Process ETL 中包含了关键修复)
 # ==========================================
 
 class AdReportProcessor:
     def __init__(self, raw_file, bench_file=None):
         self.raw_file = raw_file
         self.bench_file = bench_file
-        self.processed_dfs = {} # Phase 1 results
-        self.merged_dfs = {}    # Phase 1 results (Master)
-        self.final_json = {}    # Phase 2 results
-        self.doc = Document()   # Phase 2 Word Doc
+        self.processed_dfs = {}
+        self.merged_dfs = {}
+        self.final_json = {}
+        self.doc = Document()
 
-    # --- 阶段 1: 数据清洗与降维 (脚本 1 逻辑) ---
+    # --- 阶段 1: 数据清洗与降维 ---
     def process_etl(self):
         xls = pd.ExcelFile(self.raw_file)
-
-        # 1. 清洗各 Sheet
         for sheet_name, mapping in SHEET_MAPPINGS.items():
             if sheet_name in xls.sheet_names:
                 df = pd.read_excel(xls, sheet_name=sheet_name)
                 final_cols = {}
-
                 # 字段映射
                 for std_col, raw_col_options in mapping.items():
                     matched_col = None
                     for option in raw_col_options:
-                        if option in df.columns:
-                            matched_col = option; break
+                        if option in df.columns: matched_col = option; break
                         if not matched_col:
                             for df_col in df.columns:
-                                if option.replace(" ", "") == df_col.replace(" ", ""):
-                                    matched_col = df_col; break
+                                if option.replace(" ", "") == df_col.replace(" ", ""): matched_col = df_col; break
                         if matched_col: break
                     if matched_col: final_cols[std_col] = matched_col
 
                 if final_cols:
                     df_clean = df[list(final_cols.values())].rename(columns={v: k for k, v in final_cols.items()})
-                    text_cols = ['date_range', 'anomaly_metric_name', 'converting_keywords',
+                    
+                    # ✅ 修复重点：将 converting_countries 等列加入「不进行数字清洗」的白名单
+                    text_cols = ['date_range', 'anomaly_metric_name', 
+                                 'converting_keywords', 'converting_countries', 'converting_genders', 'converting_ages', 
                                  'custom_audience_settings', 'dimension_item', 'content_item']
+                    
                     for col in df_clean.columns:
                         if col not in text_cols:
                             df_clean[col] = df_clean[col].apply(clean_numeric)
 
-                    # 🎯 [脚本1核心逻辑] 修复重点：素材与落地页独立做 Top10（按 spend）
-                    if sheet_name in ["素材", "落地页","受众组"]:
+                    if sheet_name in ["素材", "落地页", "受众组"]:
                         if "spend" in df_clean.columns:
                             df_clean = df_clean.sort_values("spend", ascending=False).head(10)
 
                     df_clean["Source_Sheet"] = sheet_name
                     self.processed_dfs[sheet_name] = df_clean
 
-        # 2. 合并 Master Tables
+        # 合并 Master Tables
         for master_name, source_sheets in GROUP_CONFIG.items():
             dfs_to_merge = [self.processed_dfs[src] for src in source_sheets if src in self.processed_dfs]
             if dfs_to_merge:
@@ -422,9 +367,8 @@ class AdReportProcessor:
                 new_order = [c for c in priority_cols if c in cols] + [c for c in cols if c not in priority_cols]
                 self.merged_dfs[master_name] = merged_df[new_order]
 
-    # --- 阶段 2: 报告生成与架构诊断 (脚本 2 逻辑) ---
+    # --- 阶段 2: 报告生成与架构诊断 ---
     def generate_report(self):
-        # 准备 Benchmark
         benchmark_targets = {'roas': [2.0, True], 'cpm': [20.0, False], 'ctr': [0.015, True], 'cpc': [1.5, False], 'cpa': [30.0, False]}
         if self.bench_file:
             try:
@@ -435,7 +379,7 @@ class AdReportProcessor:
         self.doc.add_heading('广告投放深度分析报告', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
         self.final_json = {"report_title": "广告投放深度分析报告", "generated_at": pd.Timestamp.now().strftime("%Y-%m-%d")}
 
-        # 1. 大盘总览
+        # 1. 大盘总览 (保持不变)
         df_ov = pd.DataFrame()
         if "Master_Overview" in self.merged_dfs:
             df_src = self.merged_dfs["Master_Overview"]
@@ -443,7 +387,6 @@ class AdReportProcessor:
             df_ov = df_src[mask].copy() if not df_src[mask].empty else df_src.copy()
 
         if not df_ov.empty:
-            # 逻辑：generate_overview_struct
             date_col = find_column_fuzzy(df_ov, ['date', 'time', '时间'])
             if date_col:
                 try:
@@ -451,7 +394,6 @@ class AdReportProcessor:
                     df_clean = df_ov.dropna(subset=['temp_date']).sort_values('temp_date')
                     dates = df_clean['temp_date'].unique()
                     raw_overall = calc_metrics_dict(df_clean)
-
                     if len(dates) >= 2:
                         mid_date = dates[len(dates)//2]
                         raw_prev = calc_metrics_dict(df_clean[df_clean['temp_date'] < mid_date])
@@ -491,7 +433,6 @@ class AdReportProcessor:
                             diff = curr_val - bench_val
                             if higher_is_better: conclusion = "✅ 优于大盘" if diff > 0 else ("⚠️ 低于大盘" if diff < 0 else "持平")
                             else: conclusion = "✅ 优于大盘" if diff < 0 else ("⚠️ 高于大盘" if diff > 0 else "持平")
-
                         bench_data.append({
                             "指标": REPORT_MAPPING.get(metric_key, metric_key.upper()),
                             "当前账户": format_cell(metric_key, curr_val),
@@ -501,8 +442,7 @@ class AdReportProcessor:
                     df_b = pd.DataFrame(bench_data)
                     add_df_to_word(self.doc, df_b, "2. 行业 Benchmark 对比", level=1)
                     self.final_json['2_industry_benchmark'] = df_b.to_dict(orient='records')
-                except Exception as e:
-                    st.warning(f"大盘计算警告: {e}")
+                except Exception as e: st.warning(f"大盘计算警告: {e}")
 
         # 3. 受众组
         self.doc.add_heading("3. 受众组分析", level=1)
@@ -520,24 +460,26 @@ class AdReportProcessor:
                 mask = df_bd['Source_Sheet'].astype(str).apply(lambda x: any(k in x for k in keywords))
                 df_curr = df_bd[mask].copy()
                 if not df_curr.empty:
-                    # 计算缺失指标
                     if not find_column_fuzzy(df_curr, ['cpc']): df_curr['cpc'] = df_curr['spend'] / df_curr['clicks'].replace(0, np.nan) if 'clicks' in df_curr else 0
                     if not find_column_fuzzy(df_curr, ['cpm']): df_curr['cpm'] = (df_curr['spend'] / df_curr['impressions'].replace(0, np.nan)) * 1000 if 'impressions' in df_curr else 0
                     if not find_column_fuzzy(df_curr, ['ctr']): df_curr['ctr'] = df_curr['clicks'] / df_curr['impressions'].replace(0, np.nan) if 'impressions' in df_curr else 0
                     if not find_column_fuzzy(df_curr, ['cpa']): df_curr['cpa'] = df_curr['spend'] / df_curr['purchases'].replace(0, np.nan) if 'purchases' in df_curr else 0
 
                     req_cols = ["dimension_item", "spend", "ctr", "cpc", "cpm", "cpa", "roas"]
-                    if "受众" in title: req_cols += ["converting_countries", "converting_keywords"]
+                    # ✅ 现在，如果是受众表，这些字段已经被保留下来了
+                    if "受众" in title: req_cols += ["converting_countries", "converting_keywords", "converting_genders", "converting_ages"]
 
                     rename_map = {}; valid_cols = []
                     for req in req_cols:
                         aliases = FIELD_ALIASES.get(req, [req])
                         found = find_column_fuzzy(df_curr, aliases)
                         if found: valid_cols.append(found); rename_map[found] = req
-                        else: df_curr[req] = 0.0 if "converting" not in req else "-"; valid_cols.append(req)
+                        else: 
+                            # 对于文本字段，给 "-" 而不是 0.0
+                            default_val = "-" if "converting" in req else 0.0
+                            df_curr[req] = default_val; valid_cols.append(req)
 
                     df_final = df_curr[valid_cols].rename(columns=rename_map)
-                    # 过滤 unknown
                     if "dimension_item" in df_final.columns:
                          df_final = df_final[~df_final['dimension_item'].astype(str).str.lower().str.contains('unknow', na=False)]
 
@@ -547,76 +489,38 @@ class AdReportProcessor:
                     add_df_to_word(self.doc, df_display, title, level=2)
                     self.final_json['3_audience_analysis'][title] = df_clean.to_dict(orient='records')
 
-# 4. 素材与落地页 (从 Master_Creative)
+        # 4. 素材与落地页 (保持不变)
         if "Master_Creative" in self.merged_dfs:
             df_cr = self.merged_dfs["Master_Creative"]
-            
-            # 遍历素材和落地页两个板块
             for title, keywords, label, json_key in [("4. 素材分析", ["素材", "Creative"], "素材名称", "4_creative_analysis"), ("6. 落地页分析", ["落地页", "Landing"], "落地页 URL", "6_landing_page_analysis")]:
-                
                 mask = df_cr['Source_Sheet'].astype(str).apply(lambda x: any(k in x for k in keywords))
                 df_curr = df_cr[mask].copy()
-
                 if not df_curr.empty:
-                    # --- 1. 基础补全：计算 CPC 和 CPA ---
-                    if not find_column_fuzzy(df_curr, ['cpc']):
-                        df_curr['cpc'] = df_curr['spend'] / df_curr['clicks'].replace(0, np.nan) if 'clicks' in df_curr else 0
-                    if not find_column_fuzzy(df_curr, ['cpa']):
-                        df_curr['cpa'] = df_curr['spend'] / df_curr['purchases'].replace(0, np.nan) if 'purchases' in df_curr else 0
-
-                    # --- 2. CTR 核心修复与百分比化 (Start) ---
-                    # 步骤 A: 优先尝试使用 (点击 / 展示) 计算常规 CTR (此时为小数，如 0.015)
+                    if not find_column_fuzzy(df_curr, ['cpc']): df_curr['cpc'] = df_curr['spend'] / df_curr['clicks'].replace(0, np.nan) if 'clicks' in df_curr else 0
+                    if not find_column_fuzzy(df_curr, ['cpa']): df_curr['cpa'] = df_curr['spend'] / df_curr['purchases'].replace(0, np.nan) if 'purchases' in df_curr else 0
                     if not find_column_fuzzy(df_curr, ['ctr']):
-                        if 'impressions' in df_curr and 'clicks' in df_curr:
-                            df_curr['ctr'] = df_curr['clicks'] / df_curr['impressions'].replace(0, np.nan)
-                        else:
-                            df_curr['ctr'] = np.nan
-                    
-                    # 步骤 B: 异常修复 (针对 NaN 或 0 的行)
-                    # 公式: Decimal_CTR = CPM / (CPC * 1000)
+                         if 'impressions' in df_curr and 'clicks' in df_curr: df_curr['ctr'] = df_curr['clicks'] / df_curr['impressions'].replace(0, np.nan)
+                         else: df_curr['ctr'] = np.nan
                     if 'cpc' in df_curr.columns and 'cpm' in df_curr.columns:
                         mask_fix = (df_curr['ctr'].isna() | (df_curr['ctr'] == 0)) & (df_curr['cpc'] > 0)
-                        if mask_fix.any():
-                            df_curr.loc[mask_fix, 'ctr'] = df_curr.loc[mask_fix, 'cpm'] / (df_curr.loc[mask_fix, 'cpc'] * 1000)
+                        if mask_fix.any(): df_curr.loc[mask_fix, 'ctr'] = df_curr.loc[mask_fix, 'cpm'] / (df_curr.loc[mask_fix, 'cpc'] * 1000)
+                    df_curr['ctr'] = df_curr['ctr'].fillna(0) * 100 
 
-                    # 步骤 C: 兜底并统一转换为百分比数据 (关键修改)
-                    # 目的: 将 0.0153 转换为 1.53，以匹配 "CTR (%)" 的表头
-                    df_curr['ctr'] = df_curr['ctr'].fillna(0)
-                    df_curr['ctr'] = df_curr['ctr'] * 100 
-                    # --- 2. CTR 核心修复与百分比化 (End) ---
-
-                    # --- 3. 字段映射 ---
                     req_cols = ["content_item", "spend", "ctr", "cpc", "cpm", "roas", "cpa"]
                     rename_map = {}; valid_cols = []
-                    
                     for req in req_cols:
                         aliases = FIELD_ALIASES.get(req, [req])
                         found = find_column_fuzzy(df_curr, aliases)
-                        if found:
-                            valid_cols.append(found)
-                            rename_map[found] = req
-                        else:
-                            df_curr[req] = 0.0
-                            valid_cols.append(req)
-
+                        if found: valid_cols.append(found); rename_map[found] = req
+                        else: df_curr[req] = 0.0; valid_cols.append(req)
                     df_final = df_curr[valid_cols].rename(columns=rename_map)
-
-                    # --- 4. 排序 ---
-                    if 'spend' in df_final.columns:
-                        df_final = df_final.sort_values('spend', ascending=False).head(10)
-
-                    # --- 5. 输出 ---
-                    # 因为已经是百分比数值 (1.53)，保留 2 位小数即可
+                    if 'spend' in df_final.columns: df_final = df_final.sort_values('spend', ascending=False).head(10)
                     df_clean = df_final.round(2) 
-                    
-                    # 生成 Word 表格
                     df_display = apply_report_labels(df_clean, custom_mapping={'content_item': label})
                     add_df_to_word(self.doc, df_display, title, level=1)
-                    
-                    # 生成 JSON 数据
                     self.final_json[json_key] = df_clean.to_dict(orient='records')
                     
-        # 5. 版位 (Master_Breakdown)
+        # 5. 版位 (保持不变)
         if "Master_Breakdown" in self.merged_dfs:
              self.doc.add_heading("5. 版位分析", level=1)
              df_bd = self.merged_dfs["Master_Breakdown"]
@@ -627,7 +531,6 @@ class AdReportProcessor:
                  if not find_column_fuzzy(df_curr, ['cpa']): df_curr['cpa'] = df_curr['spend'] / df_curr['purchases'].replace(0, np.nan) if 'purchases' in df_curr else 0
                  if not find_column_fuzzy(df_curr, ['ctr']): df_curr['ctr'] = df_curr['clicks'] / df_curr['impressions'].replace(0, np.nan) if 'impressions' in df_curr else 0
                  if not find_column_fuzzy(df_curr, ['cpm']): df_curr['cpm'] = (df_curr['spend'] / df_curr['impressions'].replace(0, np.nan)) * 1000 if 'impressions' in df_curr else 0
-
                  req_cols = ['dimension_item', 'spend', 'ctr', 'cpc', 'cpm', 'roas', 'cpa']
                  rename_map = {}; valid_cols = []
                  for c in req_cols:
@@ -635,30 +538,21 @@ class AdReportProcessor:
                      f = find_column_fuzzy(df_curr, aliases)
                      if f: valid_cols.append(f); rename_map[f] = c
                      else: df_curr[c] = 0.0; valid_cols.append(c)
-
                  df_clean = df_curr[valid_cols].rename(columns=rename_map).round(2)
-
-                 # 5.1 Spend Top 5
                  df_top5 = df_clean.sort_values('spend', ascending=False).head(5)
                  add_df_to_word(self.doc, apply_report_labels(df_top5, {'dimension_item': '版位'}), "5.1 版位花费 TOP 5", level=2)
-
-                 # 5.2 High Potential
                  mean_ctr = df_clean['ctr'].mean(); mean_cpm = df_clean['cpm'].mean()
                  mask_pot = (df_clean['ctr'] > mean_ctr) & (df_clean['cpm'] < mean_cpm)
                  df_pot = df_clean[mask_pot].sort_values('ctr', ascending=False).head(5)
                  if df_pot.empty: df_pot = df_clean.sort_values('ctr', ascending=False).head(5)
                  add_df_to_word(self.doc, apply_report_labels(df_pot, {'dimension_item': '版位'}), "5.2 版位高潜力", level=2)
-
                  self.final_json['5_placement_analysis'] = {"top_spend": df_top5.to_dict('records'), "high_potential": df_pot.to_dict('records')}
 
-        # 7. 架构诊断
+        # 7. 架构诊断 (保持不变)
         rows = []
-        # 预算
         if "Master_Overview" in self.merged_dfs:
              metrics = calc_metrics_dict(self.merged_dfs["Master_Overview"])
-             # ✅ 核心修复：防止 metrics 为空，并使用安全的类型转换
              if not metrics: metrics = {} 
-             
              rows.append({
                 "模块": "预算结构", 
                 "当前结构数据表现": (
@@ -668,8 +562,6 @@ class AdReportProcessor:
                 ), 
                 "存在的问题": ""
              })
-
-        # 受众结构
         if "Master_Breakdown" in self.merged_dfs:
             df_bd = self.merged_dfs["Master_Breakdown"]
             mask = df_bd['Source_Sheet'].astype(str).apply(lambda x: any(k in x for k in ["受众", "Audience"]))
@@ -680,8 +572,6 @@ class AdReportProcessor:
                 total_s = df_aud[s_col].sum()
                 if total_s > 0: top_share = f"{df_aud[s_col].max()/total_s:.1%}"
             rows.append({"模块": "受众结构", "当前结构数据表现": f"活跃受众组数: {active_count}\nTop1 花费占比: {top_share}", "存在的问题": ""})
-
-        # 素材结构
         if "Master_Creative" in self.merged_dfs:
              df_cr = self.merged_dfs["Master_Creative"]
              mask = df_cr['Source_Sheet'].astype(str).apply(lambda x: any(k in x for k in ["素材", "Creative"]))
@@ -691,11 +581,11 @@ class AdReportProcessor:
 
         df_struct = pd.DataFrame(rows)
         add_df_to_word(self.doc, df_struct, "7. 广告架构分析", level=1)
-        self.final_json['1_data_overview'] = df_f_display.to_dict(orient='records')
-
+        if "Master_Overview" in self.merged_dfs:
+             self.final_json['7_structure_analysis'] = df_struct.to_dict(orient='records')
 
 # ==========================================
-# PART 4: Streamlit UI
+# PART 4: Streamlit UI (保持不变)
 # ==========================================
 def main():
     st.set_page_config(page_title="Auto-Merge & Analysis V20.10", layout="wide")
@@ -727,7 +617,6 @@ def main():
                 processor.process_etl()
                 st.success("✅ 阶段 1 完成：Master Tables 已生成")
 
-                # Preview Master Data
                 with st.expander("查看降维合并后的数据 (Master Tables)"):
                     tabs = st.tabs(processor.merged_dfs.keys())
                     for i, (k, v) in enumerate(processor.merged_dfs.items()):
@@ -739,20 +628,15 @@ def main():
 
             st.divider()
 
-            # --- Downloads ---
             c1, c2, c3 = st.columns(3)
-
-            # 1. JSON (Gemini)
             json_str = json.dumps(processor.final_json, indent=4, ensure_ascii=False)
             c1.download_button("📥 下载 JSON (用于大模型分析)", json_str, "Ad_Report_Data.json", "application/json")
 
-            # 2. Excel (Merged Data)
             output_xls = io.BytesIO()
             with pd.ExcelWriter(output_xls, engine='xlsxwriter') as writer:
                 for name, df in processor.merged_dfs.items(): df.to_excel(writer, sheet_name=name, index=False)
             c2.download_button("📥 下载 Excel (用于数据透视)", output_xls.getvalue(), "Merged_Ad_Report_Final.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-            # 3. Word (Report)
             output_doc = io.BytesIO()
             processor.doc.save(output_doc)
             c3.download_button("📥 下载 Word (用于数据审查)", output_doc.getvalue(), "Ad_Report_Final_V20_10.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
