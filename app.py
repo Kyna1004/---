@@ -672,52 +672,6 @@ def main():
             background-size: cover;
         }
         
-        /* Reduce default top padding to make the nav bar look better */
-        .block-container {
-            padding-top: 2rem;
-        }
-
-        /* NEW: Top Navigation Bar Style */
-        .top-nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.8rem 1.5rem;
-            background: rgba(255, 255, 255, 0.5); /* Glassmorphism transparency */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
-            margin-bottom: 2rem;
-        }
-
-        .nav-logo {
-            font-size: 1.2rem;
-            font-weight: 700;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            /* Unified Gradient Style */
-            background: linear-gradient(135deg, #662D8C 0%, #ED1E79 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .nav-items {
-            display: flex;
-            gap: 1.5rem;
-            font-size: 0.9rem;
-            color: #666;
-            font-weight: 500;
-        }
-        
-        .nav-item-active {
-            color: #ED1E79; /* Pink accent */
-            font-weight: 600;
-        }
-
         /* 1. Main Title Style (Gradient) */
         .main-title {
             text-align: center;
@@ -818,8 +772,9 @@ def main():
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); /* Subtle depth */
         }
 
-        /* 4. BUTTON STYLES: High Contrast Gradient (Purple -> Cyan) */
-        div.stButton > button, div.stDownloadButton > button {
+        /* 4. MAIN ACTION BUTTON: High Contrast Gradient (Purple -> Cyan) */
+        /* Only targets the Start button */
+        div.stButton > button {
             display: block;
             margin: 0 auto;
             width: 100%;
@@ -833,12 +788,47 @@ def main():
             box-shadow: 0 6px 20px rgba(183, 33, 255, 0.4); 
             transition: all 0.3s ease;
         }
-        
-        div.stButton > button:hover, div.stDownloadButton > button:hover {
+        div.stButton > button:hover {
             opacity: 0.95;
             transform: translateY(-3px) scale(1.02);
             box-shadow: 0 10px 30px rgba(33, 212, 253, 0.5);
-            color: white !important;
+        }
+        
+        /* 5. DOWNLOAD BUTTONS: 3D Light Gradient Style */
+        /* Targets the 3 download buttons */
+        div.stDownloadButton > button {
+            display: block;
+            margin: 0 auto;
+            width: 100%;
+            
+            /* Light 3D Gradient - Subtle Purple/White */
+            background: linear-gradient(145deg, rgba(255, 255, 255, 1) 0%, rgba(245, 235, 255, 1) 100%);
+            
+            /* Dark Purple Text for contrast on light bg */
+            color: #662D8C !important; 
+            
+            border-radius: 30px;
+            padding: 0.7rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 700;
+            
+            /* 3D Effects */
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 
+                0 4px 10px rgba(102, 45, 140, 0.08), /* Soft drop shadow */
+                inset 0 1px 0 rgba(255, 255, 255, 0.9), /* Top highlight */
+                inset 0 -2px 0 rgba(0, 0, 0, 0.03); /* Subtle bottom bevel */
+            
+            transition: all 0.2s ease;
+        }
+        
+        div.stDownloadButton > button:hover {
+            transform: translateY(-2px);
+            /* Slightly brighter/more purple on hover */
+            background: linear-gradient(145deg, #ffffff 0%, #f0e6ff 100%);
+            border-color: #ED1E79; /* Pinkish border on hover */
+            box-shadow: 0 8px 15px rgba(102, 45, 140, 0.15);
+            color: #ED1E79 !important;
         }
         
         div[data-baseweb="notification"] {
@@ -847,21 +837,6 @@ def main():
             border-radius: 12px;
         }
         </style>
-    """, unsafe_allow_html=True)
-
-    # --- Top Navigation Bar ---
-    st.markdown("""
-        <div class="top-nav">
-            <div class="nav-logo">
-                <span>✨</span> Auto-Merge <span style="font-weight:300; opacity:0.8; margin-left:4px;">Analysis</span>
-            </div>
-            <div class="nav-items">
-                <span class="nav-item-active">Dashboard</span>
-                <span>History</span>
-                <span>Settings</span>
-                <span>Help</span>
-            </div>
-        </div>
     """, unsafe_allow_html=True)
 
     # --- Header Section ---
