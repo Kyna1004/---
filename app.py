@@ -634,6 +634,8 @@ class AdReportProcessor:
 # ==========================================
 # PART 4: Streamlit UI (保持不变)
 # ==========================================
+# --- MOCK CLASS FOR DEMONSTRATION (请在实际项目中替换为您的真实引用) ---
+# 实际代码中请删除此类，并使用: from your_module import AdReportProcessor
 class AdReportProcessor:
     def __init__(self, raw, bench):
         self.raw = raw
@@ -669,6 +671,52 @@ def main():
             background-attachment: fixed;
             background-size: cover;
         }
+        
+        /* Reduce default top padding to make the nav bar look better */
+        .block-container {
+            padding-top: 2rem;
+        }
+
+        /* NEW: Top Navigation Bar Style */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 1.5rem;
+            background: rgba(255, 255, 255, 0.5); /* Glassmorphism transparency */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+            margin-bottom: 2rem;
+        }
+
+        .nav-logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            /* Unified Gradient Style */
+            background: linear-gradient(135deg, #662D8C 0%, #ED1E79 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-items {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .nav-item-active {
+            color: #ED1E79; /* Pink accent */
+            font-weight: 600;
+        }
 
         /* 1. Main Title Style (Gradient) */
         .main-title {
@@ -693,23 +741,60 @@ def main():
             margin-bottom: 3rem;
         }
 
-        /* 3. Card/Container Headers */
-        /* Make cards slightly translucent to blend with background */
-        div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlock"] {
-            /* This selector targets inner containers if needed, but st.container(border=True) handles most */
+        /* --- NEW: High-End Glassmorphism Card Style (Matching Circled Areas) --- */
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            background: rgba(255, 255, 255, 0.45) !important; /* Milky transparent white */
+            backdrop-filter: blur(14px); /* Blur effect for "Glass" look */
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.8) !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); /* Soft shadow */
+            border-radius: 24px !important; /* Smooth rounded corners */
+            padding: 1rem;
+            transition: all 0.3s ease;
         }
-        
+
+        /* Hover Effect for Cards: Subtle Lift & Purple/Pink Tint */
+        [data-testid="stVerticalBlockBorderWrapper"]:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(102, 45, 140, 0.1); /* Purple tint shadow */
+            border-color: rgba(237, 30, 121, 0.2) !important; /* Subtle pink border */
+            background: rgba(255, 255, 255, 0.65) !important;
+        }
+
+        /* 3. Card Headers & Icons */
         .card-header {
             text-align: center;
             font-weight: 600;
-            color: #555;
-            margin-bottom: 1rem;
+            color: #4A4A4A;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.5px;
         }
         
         .icon-container {
             text-align: center;
-            font-size: 3rem;
-            margin-bottom: 10px;
+            font-size: 2.5rem;
+            margin-bottom: 5px;
+            /* Optional: Add a subtle glow to emojis */
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+
+        /* --- Customizing the Streamlit File Uploader (Inner Box) --- */
+        [data-testid='stFileUploader'] section {
+            background-color: rgba(255, 255, 255, 0.3);
+            border: 1.5px dashed rgba(102, 45, 140, 0.25); /* Light Purple Dashed Border */
+            border-radius: 16px;
+            padding: 1rem;
+        }
+        
+        [data-testid='stFileUploader'] section:hover {
+            background-color: rgba(255, 255, 255, 0.6);
+            border-color: rgba(237, 30, 121, 0.5); /* Pinkish on hover */
+        }
+        
+        [data-testid='stFileUploader'] button {
+            border-radius: 20px;
+            border-color: rgba(102, 45, 140, 0.2);
+            color: #662D8C;
         }
 
         /* 4. Center the 'Start' button with Gradient */
@@ -719,26 +804,44 @@ def main():
             /* Gradient Background */
             background-image: linear-gradient(135deg, #CB5EEE 0%, #4BE1EC 100%);
             color: white;
-            border-radius: 25px;
-            padding: 0.6rem 2.5rem;
-            font-size: 1.1rem;
+            border-radius: 30px;
+            padding: 0.7rem 3rem;
+            font-size: 1.15rem;
             font-weight: 600;
             border: none;
-            box-shadow: 0 4px 15px rgba(203, 94, 238, 0.3);
+            box-shadow: 0 6px 20px rgba(203, 94, 238, 0.35);
             transition: all 0.3s ease;
         }
         div.stButton > button:hover {
-            opacity: 0.9;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(203, 94, 238, 0.5);
+            opacity: 0.95;
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(203, 94, 238, 0.5);
             color: white;
         }
         
-        /* Optional: Transparent background for containers to show the glow */
-        [data-testid="stForm"] {
-            background-color: rgba(255, 255, 255, 0.5);
+        /* Style for the 'Advice' Info Box in Download Section */
+        div[data-baseweb="notification"] {
+            background-color: rgba(102, 45, 140, 0.05); /* Very light purple bg */
+            border-left-color: #662D8C;
+            border-radius: 12px;
         }
+
         </style>
+    """, unsafe_allow_html=True)
+
+    # --- Top Navigation Bar ---
+    st.markdown("""
+        <div class="top-nav">
+            <div class="nav-logo">
+                <span>✨</span> Auto-Merge <span style="font-weight:300; opacity:0.8; margin-left:4px;">Analysis</span>
+            </div>
+            <div class="nav-items">
+                <span class="nav-item-active">Dashboard</span>
+                <span>History</span>
+                <span>Settings</span>
+                <span>Help</span>
+            </div>
+        </div>
     """, unsafe_allow_html=True)
 
     # --- Header Section ---
@@ -753,6 +856,7 @@ def main():
 
     with col1:
         # Use container with border to mimic the card look
+        # This will now pick up the "High-End Glassmorphism" styles defined in CSS
         with st.container(border=True):
             st.markdown('<div class="icon-container">📊</div>', unsafe_allow_html=True)
             st.markdown('<div class="card-header">上传数据报表 (Excel)</div>', unsafe_allow_html=True)
@@ -806,43 +910,46 @@ def main():
             
             # --- Results Area ---
             st.markdown("### 📥 下载结果文件")
-            st.info("建议：您可只选择下载 JSON 格式文件用于大模型分析，如有必要再下载其他格式文件。")
+            
+            # WRAPPED IN CONTAINER to match the top cards style (Glassmorphism)
+            with st.container(border=True):
+                st.info("💡 建议：您可只选择下载 JSON 格式文件用于大模型分析，如有必要再下载其他格式文件。")
 
-            res_c1, res_c2, res_c3 = st.columns(3)
+                res_c1, res_c2, res_c3 = st.columns(3)
 
-            # 1. JSON
-            json_str = json.dumps(processor.final_json, indent=4, ensure_ascii=False)
-            res_c1.download_button(
-                "📥 JSON (大模型分析)", 
-                json_str, 
-                "Ad_Report_Data.json", 
-                "application/json",
-                use_container_width=True
-            )
+                # 1. JSON
+                json_str = json.dumps(processor.final_json, indent=4, ensure_ascii=False)
+                res_c1.download_button(
+                    "📥 JSON (大模型分析)", 
+                    json_str, 
+                    "Ad_Report_Data.json", 
+                    "application/json",
+                    use_container_width=True
+                )
 
-            # 2. Excel
-            output_xls = io.BytesIO()
-            with pd.ExcelWriter(output_xls, engine='xlsxwriter') as writer:
-                for name, df in processor.merged_dfs.items(): 
-                    df.to_excel(writer, sheet_name=name, index=False)
-            res_c2.download_button(
-                "📥 Excel (数据透视)", 
-                output_xls.getvalue(), 
-                "Merged_Ad_Report_Final.xlsx", 
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+                # 2. Excel
+                output_xls = io.BytesIO()
+                with pd.ExcelWriter(output_xls, engine='xlsxwriter') as writer:
+                    for name, df in processor.merged_dfs.items(): 
+                        df.to_excel(writer, sheet_name=name, index=False)
+                res_c2.download_button(
+                    "📥 Excel (数据透视)", 
+                    output_xls.getvalue(), 
+                    "Merged_Ad_Report_Final.xlsx", 
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
 
-            # 3. Word
-            output_doc = io.BytesIO()
-            processor.doc.save(output_doc)
-            res_c3.download_button(
-                "📥 Word (数据审查)", 
-                output_doc.getvalue(), 
-                "Ad_Report_Final_V20_10.docx", 
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
+                # 3. Word
+                output_doc = io.BytesIO()
+                processor.doc.save(output_doc)
+                res_c3.download_button(
+                    "📥 Word (数据审查)", 
+                    output_doc.getvalue(), 
+                    "Ad_Report_Final_V20_10.docx", 
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
 
         except Exception as e:
             st.error(f"❌ 处理过程中发生错误: {str(e)}")
