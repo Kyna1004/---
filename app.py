@@ -594,7 +594,7 @@ class AdReportProcessor:
 # ==========================================
 def main():
     st.set_page_config(page_title="Auto-Merge & Analysis V20.10", layout="wide")
-    st.title("📊"广告优化报告数据终表生产")
+    st.title("📊广告优化报告数据终表生产")
 
     st.markdown("""
     **功能说明：**
