@@ -521,6 +521,16 @@ class AdReportProcessor:
                             df_curr[req] = default_val; valid_cols.append(req)
 
                     df_final = df_curr[valid_cols].rename(columns=rename_map)
+                    
+                    # =======================================================
+                    # ✅ 修复异常值：显式填充 NaN 为 "-"
+                    # =======================================================
+                    text_columns_to_fix = ["converting_countries", "converting_keywords", "converting_genders", "converting_ages"]
+                    for t_col in text_columns_to_fix:
+                        if t_col in df_final.columns:
+                            # 将 NaN 填充为 "-"，同时防止出现字符串 "nan"
+                            df_final[t_col] = df_final[t_col].fillna("-").astype(str).replace("nan", "-")
+                            
                     if "dimension_item" in df_final.columns:
                          df_final = df_final[~df_final['dimension_item'].astype(str).str.lower().str.contains('unknow', na=False)]
 
