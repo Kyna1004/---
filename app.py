@@ -241,6 +241,8 @@ def safe_div(numerator, denominator, multiplier=1.0):
     # AOV: 收入 / 购买数
     res['aov'] = safe_div(sums.get('purchase_value'), sums.get('purchases'))
 
+    return res
+
     # 辅助信息
     date_col = find_column_fuzzy(df_chunk, ['date', 'time', 'range'])
     if date_col:
