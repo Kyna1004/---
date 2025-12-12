@@ -127,7 +127,34 @@ FIELD_ALIASES = {
 # PART 2: 核心工具函数
 # ==========================================
 
-# 宽松清洗
+def parse_float(value):
+    """辅助函数：清理数据并将字符串/数字安全转换为浮点数"""
+    if value is None:
+        return 0.0
+    try:
+        # 如果已经是数字，直接返回
+        if isinstance(value, (int, float)):
+            return float(value)
+        # 如果是字符串，去除逗号和空格后再转换
+        return float(str(value).replace(',', '').strip())
+    except (ValueError, TypeError):
+        return 0.0
+
+def safe_div(numerator, denominator, multiplier=1.0):
+    """
+    安全除法：
+    - 自动清理字符串中的逗号
+    - 分母为0或无效时返回 0.0
+    """
+    n = parse_float(numerator)
+    d = parse_float(denominator)
+    
+    if d > 0:
+        return (n / d) * multiplier
+    else:
+        return 0.0
+
+# 宽松清洗（用于展示）
 def clean_numeric(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -136,8 +163,8 @@ def clean_numeric(val):
     try: return float(val_str)
     except: return val
 
-# 严格清洗
-def clean_numeric_strict(val): # 脚本2的严格清洗，用于计算
+# 严格清洗（用于计算）
+def clean_numeric_strict(val): 
     if pd.isna(val): return 0.0
     val_str = str(val).strip().replace('$', '').replace('¥', '').replace(',', '')
     if '%' in val_str: val_str = val_str.replace('%', '')
@@ -165,6 +192,7 @@ def calc_metrics_dict(df_chunk):
     sums = {}
     targets = ['spend', 'clicks', 'impressions', 'purchases', 'purchase_value',
                'landing_page_views', 'add_to_cart', 'initiate_checkout']
+    
     for t in targets:
         aliases = FIELD_ALIASES.get(t, [t])
         if t == 'purchase_value' and 'value' not in aliases: aliases.append('value')
@@ -174,33 +202,6 @@ def calc_metrics_dict(df_chunk):
              sums[t] = df_chunk[col].apply(clean_numeric_strict).sum()
         else:
              sums[t] = 0.0
-
-def parse_float(value):
-    """辅助函数：清理数据并将字符串/数字安全转换为浮点数"""
-    if value is None:
-        return 0.0
-    try:
-        # 如果已经是数字，直接返回
-        if isinstance(value, (int, float)):
-            return float(value)
-        # 如果是字符串，去除逗号和空格后再转换
-        return float(str(value).replace(',', '').strip())
-    except (ValueError, TypeError):
-        return 0.0
-
-def safe_div(numerator, denominator, multiplier=1.0):
-    """
-    安全除法：
-    - 自动清理字符串中的逗号
-    - 分母为0或无效时返回 0.0
-    """
-    n = parse_float(numerator)
-    d = parse_float(denominator)
-    
-    if d > 0:
-        return (n / d) * multiplier
-    else:
-        return 0.0
 
     # --- 应用计算逻辑 ---
 
@@ -241,9 +242,7 @@ def safe_div(numerator, denominator, multiplier=1.0):
     # AOV: 收入 / 购买数
     res['aov'] = safe_div(sums.get('purchase_value'), sums.get('purchases'))
 
-    return res
-
-    # 辅助信息
+    # 辅助信息: 时间范围
     date_col = find_column_fuzzy(df_chunk, ['date', 'time', 'range'])
     if date_col:
         try:
@@ -252,7 +251,8 @@ def safe_div(numerator, denominator, multiplier=1.0):
             else: res['date_range'] = "-"
         except: res['date_range'] = "-"
     else: res['date_range'] = "-"
-    return res
+    
+    return res  # ✅ 关键修复：确保有返回值，否则会报 NoneType error
 
 def format_cell(key, val, is_mom=False):
     if isinstance(val, str): return val
@@ -616,7 +616,18 @@ class AdReportProcessor:
         # 预算
         if "Master_Overview" in self.merged_dfs:
              metrics = calc_metrics_dict(self.merged_dfs["Master_Overview"])
-             rows.append({"模块": "预算结构", "当前结构数据表现": f"总花费: ${metrics.get('spend',0):,.2f}\nCPA: ${metrics.get('cpa',0):.2f}\nROAS: {metrics.get('roas',0):.2f}", "存在的问题": ""})
+             # ✅ 核心修复：防止 metrics 为空，并使用安全的类型转换
+             if not metrics: metrics = {} 
+             
+             rows.append({
+                "模块": "预算结构", 
+                "当前结构数据表现": (
+                    f"总花费: ${float(str(metrics.get('spend', 0)).replace(',', '')):,.2f}\n"
+                    f"CPA: ${float(str(metrics.get('cpa', 0)).replace(',', '')):.2f}\n"
+                    f"ROAS: {float(str(metrics.get('roas', 0)).replace(',', '')):.2f}"
+                ), 
+                "存在的问题": ""
+             })
 
         # 受众结构
         if "Master_Breakdown" in self.merged_dfs:
