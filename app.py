@@ -175,53 +175,71 @@ def calc_metrics_dict(df_chunk):
         else:
              sums[t] = 0.0
 
-# 1. 定义一个安全的除法函数 (核心优化)
-def safe_div(numerator, denominator, multiplier=1.0):
-    """
-    安全除法：
-    - 如果分母 > 0，执行除法并乘以系数 (如CPM需乘1000)
-    - 如果分母 <= 0 (或为None/0)，返回 0.0
-    """
+def parse_float(value):
+    """辅助函数：清理数据并将字符串/数字安全转换为浮点数"""
+    if value is None:
+        return 0.0
     try:
-        n = float(numerator)
-        d = float(denominator)
-        if d > 0:
-            return (n / d) * multiplier
-        else:
-            return 0.0
+        # 如果已经是数字，直接返回
+        if isinstance(value, (int, float)):
+            return float(value)
+        # 如果是字符串，去除逗号和空格后再转换
+        return float(str(value).replace(',', '').strip())
     except (ValueError, TypeError):
         return 0.0
 
-    # 2. 应用优化后的公式
-    # 直接调用 safe_div，再也不用担心 eps 产生的异常值
-    res['spend'] = sums['spend']
+def safe_div(numerator, denominator, multiplier=1.0):
+    """
+    安全除法：
+    - 自动清理字符串中的逗号
+    - 分母为0或无效时返回 0.0
+    """
+    n = parse_float(numerator)
+    d = parse_float(denominator)
+    
+    if d > 0:
+        return (n / d) * multiplier
+    else:
+        return 0.0
+
+    # --- 应用计算逻辑 ---
+
+    # 1. 基础指标 (这里必须转为float，修复之前的报错)
+    res['spend'] = parse_float(sums.get('spend', 0))
+    res['impressions'] = parse_float(sums.get('impressions', 0))
+    res['clicks'] = parse_float(sums.get('clicks', 0))
+    res['purchases'] = parse_float(sums.get('purchases', 0))
+    res['purchase_value'] = parse_float(sums.get('purchase_value', 0))
+
+    # 2. 计算衍生指标 (直接调用 safe_div，无需再担心类型或除零)
 
     # ROAS: 收入 / 花费
-    res['roas'] = safe_div(sums['purchase_value'], sums['spend'])
+    res['roas'] = safe_div(sums.get('purchase_value'), sums.get('spend'))
 
-    # CPM: (花费 / 展示) * 1000  -> multiplier=1000
-    res['cpm'] = safe_div(sums['spend'], sums['impressions'], multiplier=1000)
+    # CPM: (花费 / 展示) * 1000
+    res['cpm'] = safe_div(sums.get('spend'), sums.get('impressions'), multiplier=1000)
 
     # CPC: 花费 / 点击
-    res['cpc'] = safe_div(sums['spend'], sums['clicks'])
+    res['cpc'] = safe_div(sums.get('spend'), sums.get('clicks'))
 
-    # CTR: 点击 / 展示
-    res['ctr'] = safe_div(sums['clicks'], sums['impressions'])
+    # CTR: 点击 / 展示 (结果是小数，如 0.015)
+    res['ctr'] = safe_div(sums.get('clicks'), sums.get('impressions'))
 
-    # CPA: 花费 / 购买数 (这里解决了你的大异常值问题)
-    res['cpa'] = safe_div(sums['spend'], sums['purchases'])
+    # CPA: 花费 / 购买数 (解决了异常值问题)
+    res['cpa'] = safe_div(sums.get('spend'), sums.get('purchases'))
 
     # CVR: 购买数 / 点击
-    res['cvr_purchase'] = safe_div(sums['purchases'], sums['clicks'])
+    res['cvr_purchase'] = safe_div(sums.get('purchases'), sums.get('clicks'))
 
-    # 漏斗转化率系列
-    res['rate_click_to_lp'] = safe_div(sums['landing_page_views'], sums['clicks'])
-    res['rate_lp_to_atc']   = safe_div(sums['add_to_cart'], sums['landing_page_views'])
-    res['rate_atc_to_ic']   = safe_div(sums['initiate_checkout'], sums['add_to_cart'])
-    res['rate_ic_to_pur']   = safe_div(sums['purchases'], sums['initiate_checkout'])
+    # 3. 漏斗转化率系列
+    # 使用 .get() 防止字典中缺少某个键导致报错
+    res['rate_click_to_lp'] = safe_div(sums.get('landing_page_views'), sums.get('clicks'))
+    res['rate_lp_to_atc']   = safe_div(sums.get('add_to_cart'), sums.get('landing_page_views'))
+    res['rate_atc_to_ic']   = safe_div(sums.get('initiate_checkout'), sums.get('add_to_cart'))
+    res['rate_ic_to_pur']   = safe_div(sums.get('purchases'), sums.get('initiate_checkout'))
 
     # AOV: 收入 / 购买数
-    res['aov'] = safe_div(sums['purchase_value'], sums['purchases'])
+    res['aov'] = safe_div(sums.get('purchase_value'), sums.get('purchases'))
 
     # 辅助信息
     date_col = find_column_fuzzy(df_chunk, ['date', 'time', 'range'])
