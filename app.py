@@ -10,6 +10,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.shared import OxmlElement
 from docx.oxml.ns import qn
 import docx.opc.constants
+import time
 
 # ==========================================
 # PART 1: 配置区域 (修复了字段映射)
