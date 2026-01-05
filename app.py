@@ -35,8 +35,8 @@ SHEET_MAPPINGS = {
         "date_range": ["时间范围"],
         "clicks_all": ["点击"],
         "landing_page_views": ["落地页浏览量"],
-        "add_to_cart": ["加入购物车"],
-        "initiate_checkout": ["结账发起次数"],
+        "add_to_cart": ["加入购物车", "加购", "Add to Cart"], # ✅ 确保映射
+        "initiate_checkout": ["结账发起次数", "结账", "Initiate Checkout"],
         "rate_click_to_lp": ["点击-落地页浏览转化率"],
         "rate_lp_to_atc": ["落地页浏览-加购转化率"],
         "rate_atc_to_ic": ["加购-结账转化率"],
@@ -119,7 +119,6 @@ FIELD_ALIASES = {
     "clicks": ["clicks", "clicks (all)", "点击量", "clicks_all"],
     "impressions": ["impressions", "展示", "展现"],
     "ctr_all": ["ctr_all", "ctr (all)", "点击率 (all)"],
-    # ✅ 保持这些映射
     "add_to_cart": ["add_to_cart", "加入购物车", "加购", "cart"],
     "initiate_checkout": ["initiate_checkout", "结账发起次数", "结账", "checkout"],
     "landing_page_views": ["landing_page_views", "落地页浏览量", "落地页", "landing"]
@@ -127,27 +126,21 @@ FIELD_ALIASES = {
 
 
 # ==========================================
-# PART 2: 核心工具函数 (✅ 修复位置：calc_metrics_dict)
+# PART 2: 核心工具函数 (保持上一次修复的状态)
 # ==========================================
 
 def parse_float(value):
-    """辅助函数：清理数据并将字符串/数字安全转换为浮点数"""
-    if value is None:
-        return 0.0
+    if value is None: return 0.0
     try:
-        if isinstance(value, (int, float)):
-            return float(value)
+        if isinstance(value, (int, float)): return float(value)
         return clean_numeric_strict(value)
-    except (ValueError, TypeError):
-        return 0.0
+    except: return 0.0
 
 def safe_div(numerator, denominator, multiplier=1.0):
     n = parse_float(numerator)
     d = parse_float(denominator)
-    if d > 0:
-        return (n / d) * multiplier
-    else:
-        return 0.0
+    if d > 0: return (n / d) * multiplier
+    else: return 0.0
 
 def clean_numeric(val):
     if pd.isna(val): return 0.0
@@ -184,7 +177,6 @@ def find_column_fuzzy(df, keywords):
             if kw.lower() in col_lower: return col
     return None
 
-# ✅ 修复重点：此函数已修正，确保 'add_to_cart' 被赋值到结果字典
 def calc_metrics_dict(df_chunk):
     res = {}
     if df_chunk.empty: return res
@@ -206,8 +198,6 @@ def calc_metrics_dict(df_chunk):
     res['clicks'] = parse_float(sums.get('clicks', 0))
     res['purchases'] = parse_float(sums.get('purchases', 0))
     res['purchase_value'] = parse_float(sums.get('purchase_value', 0))
-    
-    # ✅ 修复点：显式将计算出的总和赋值给结果字典
     res['add_to_cart'] = parse_float(sums.get('add_to_cart', 0))
     res['initiate_checkout'] = parse_float(sums.get('initiate_checkout', 0))
     res['landing_page_views'] = parse_float(sums.get('landing_page_views', 0))
@@ -259,8 +249,7 @@ def extract_benchmark_values(df_bench):
             try:
                 s = df_bench[found_col].apply(clean_numeric_strict)
                 v = s[s>0].mean()
-                if metric in ['ctr'] and v > 1.0:
-                    v = v / 100.0
+                if metric in ['ctr'] and v > 1.0: v = v / 100.0
                 if not pd.isna(v): extracted[metric] = [v, higher_better]
             except: pass
     return extracted
@@ -415,7 +404,39 @@ class AdReportProcessor:
                     df_ov['temp_date'] = pd.to_datetime(df_ov[date_col], errors='coerce')
                     df_clean = df_ov.dropna(subset=['temp_date']).sort_values('temp_date')
                     dates = df_clean['temp_date'].unique()
+                    
+                    # 正常计算逻辑
                     raw_overall = calc_metrics_dict(df_clean)
+                    
+                    # ======================================================
+                    # ✅ [FIX] 强制使用【整体数据】Sheet 中的值覆盖计算值
+                    # ======================================================
+                    # 原因：分时段数据可能缺少加购/结账等字段，导致累加为0。
+                    # 而【整体数据】Sheet通常包含准确的汇总值。
+                    if "Master_Overview" in self.merged_dfs:
+                         df_all = self.merged_dfs["Master_Overview"]
+                         # 找到 Source_Sheet 是 "整体数据" 的行
+                         mask_summary = df_all['Source_Sheet'] == "整体数据"
+                         df_summary = df_all[mask_summary]
+                         
+                         if not df_summary.empty:
+                             # 假设只有一行汇总数据，取第一行
+                             summary_row = df_summary.iloc[0]
+                             
+                             # 尝试直接读取这些关键指标，如果有值且大于0，则覆盖 raw_overall
+                             direct_metrics = ['add_to_cart', 'initiate_checkout', 'purchases', 'landing_page_views']
+                             for m in direct_metrics:
+                                 if m in summary_row:
+                                     val = clean_numeric_strict(summary_row[m])
+                                     if val > 0:
+                                         raw_overall[m] = val
+                             
+                             # 重新计算依赖这些绝对值的转化率
+                             raw_overall['rate_lp_to_atc'] = safe_div(raw_overall.get('add_to_cart', 0), raw_overall.get('landing_page_views', 0))
+                             raw_overall['rate_atc_to_ic'] = safe_div(raw_overall.get('initiate_checkout', 0), raw_overall.get('add_to_cart', 0))
+                             raw_overall['rate_ic_to_pur'] = safe_div(raw_overall.get('purchases', 0), raw_overall.get('initiate_checkout', 0))
+                    # ======================================================
+
                     if len(dates) >= 2:
                         mid_date = dates[len(dates)//2]
                         raw_prev = calc_metrics_dict(df_clean[df_clean['temp_date'] < mid_date])
