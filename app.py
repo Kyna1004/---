@@ -13,7 +13,7 @@ import docx.opc.constants
 import time
 
 # ==========================================
-# PART 1: 配置区域 (修复了字段映射)
+# PART 1: 配置区域 (保持不变)
 # ==========================================
 
 COMMON_METRICS = {
@@ -29,7 +29,6 @@ COMMON_METRICS = {
     "aov": ["单次购买价值", "单次购物价值"]
 }
 
-# 框定「每一个 Sheet」需要抽取哪些指标
 SHEET_MAPPINGS = {
     "整体数据": {
         **COMMON_METRICS,
@@ -107,7 +106,6 @@ REPORT_MAPPING = {
     "converting_countries": "产生成效的国家", "converting_genders": "产生成效的性别", "converting_ages": "产生成效的年龄"
 }
 
-# ✅ 增强了模糊匹配别名 (修复核心：增加了add_to_cart等字段的映射)
 FIELD_ALIASES = {
     "adset_id": ["adset_id", "ad set id", "adset id", "广告组编号", "广告组id", "adset_name", "ad set name"],
     "converting_countries": ["converting_countries", "country", "region", "国家", "地区", "location"],
@@ -121,7 +119,7 @@ FIELD_ALIASES = {
     "clicks": ["clicks", "clicks (all)", "点击量", "clicks_all"],
     "impressions": ["impressions", "展示", "展现"],
     "ctr_all": ["ctr_all", "ctr (all)", "点击率 (all)"],
-    # ✅ 修复位置：新增以下三行映射，确保计算函数能找到中文列名
+    # ✅ 保持这些映射
     "add_to_cart": ["add_to_cart", "加入购物车", "加购", "cart"],
     "initiate_checkout": ["initiate_checkout", "结账发起次数", "结账", "checkout"],
     "landing_page_views": ["landing_page_views", "落地页浏览量", "落地页", "landing"]
@@ -129,7 +127,7 @@ FIELD_ALIASES = {
 
 
 # ==========================================
-# PART 2: 核心工具函数 (已修复百分比识别问题)
+# PART 2: 核心工具函数 (✅ 修复位置：calc_metrics_dict)
 # ==========================================
 
 def parse_float(value):
@@ -186,6 +184,7 @@ def find_column_fuzzy(df, keywords):
             if kw.lower() in col_lower: return col
     return None
 
+# ✅ 修复重点：此函数已修正，确保 'add_to_cart' 被赋值到结果字典
 def calc_metrics_dict(df_chunk):
     res = {}
     if df_chunk.empty: return res
@@ -207,7 +206,12 @@ def calc_metrics_dict(df_chunk):
     res['clicks'] = parse_float(sums.get('clicks', 0))
     res['purchases'] = parse_float(sums.get('purchases', 0))
     res['purchase_value'] = parse_float(sums.get('purchase_value', 0))
-    res['add_to_cart'] = parse_float(sums.get('add_to_cart', 0)) # ✅ 确保写入结果
+    
+    # ✅ 修复点：显式将计算出的总和赋值给结果字典
+    res['add_to_cart'] = parse_float(sums.get('add_to_cart', 0))
+    res['initiate_checkout'] = parse_float(sums.get('initiate_checkout', 0))
+    res['landing_page_views'] = parse_float(sums.get('landing_page_views', 0))
+    
     res['roas'] = safe_div(sums.get('purchase_value'), sums.get('spend'))
     res['cpm'] = safe_div(sums.get('spend'), sums.get('impressions'), multiplier=1000)
     res['cpc'] = safe_div(sums.get('spend'), sums.get('clicks'))
