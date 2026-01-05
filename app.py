@@ -10,22 +10,22 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.shared import OxmlElement
 from docx.oxml.ns import qn
 import docx.opc.constants
-import time
+import re
 
 # ==========================================
-# PART 1: 配置区域 (已增强 'add_to_cart' 映射)
+# PART 1: 配置区域 (扩充了匹配词库)
 # ==========================================
 
 COMMON_METRICS = {
-    "spend": ["花费金额(USD)", "花费金额 （USD）", "花费金额 (USD)", "花费金额", "Amount Spent", "Cost"],
+    "spend": ["花费金额(USD)", "花费金额 （USD）", "花费金额 (USD)", "花费金额", "Amount Spent", "Cost", "花费"],
     "roas": ["广告花费回报 (ROAS) - 购物", "广告花费回报（ROAS）-购物", "ROAS", "Purchase ROAS", "Return on Ad Spend"],
     "purchases": ["购买次数", "成效数量", "成效", "Purchases", "Results", "Website Purchases"],
-    "cpa": ["单次购买费用", "单次购物成本", "单次成效成本", "单次成效费用", "Cost per Purchase", "Cost per Result"],
+    "cpa": ["单次购买费用", "单次购物成本", "单次成效成本", "单次成效费用", "Cost per Purchase", "Cost per Result", "CPA"],
     "ctr": ["链接点击率", "链接点击率（%)", "链接点击率（%）", "CTR", "Link CTR"],
     "cpm": ["千次展示费用", "CPM", "Cost per 1,000 Impressions"],
     "clicks": ["点击", "链接点击", "Clicks", "Link Clicks"],
     "impressions": ["曝光", "展示次数", "Impressions"],
-    "purchase_value": ["购买价值", "购物价值", "Purchase Value", "Conversion Value"],
+    "purchase_value": ["购买价值", "购物价值", "Purchase Value", "Conversion Value", "Total Value"],
     "aov": ["单次购买价值", "单次购物价值"]
 }
 
@@ -34,10 +34,10 @@ SHEET_MAPPINGS = {
         **COMMON_METRICS,
         "date_range": ["时间范围", "Date Range", "Time"],
         "clicks_all": ["点击", "点击(全部)", "Clicks (All)"],
-        "landing_page_views": ["落地页浏览量", "落地页", "Landing Page Views", "Landing"],
-        # ✅ 修改点：增加了更多常见的加购列名别名
-        "add_to_cart": ["加入购物车", "加购", "Add to Cart", "Website Adds to Cart", "网站加购", "Adds to Cart"], 
-        "initiate_checkout": ["结账发起次数", "结账", "Initiate Checkout", "Website Initiated Checkouts", "网站结账发起"],
+        "landing_page_views": ["落地页浏览量", "落地页", "Landing Page Views", "Landing", "落地页浏览"],
+        # ✅ 这里的匹配词只是第一道防线，下面的代码里加了“超级匹配”
+        "add_to_cart": ["加入购物车", "加购", "Add to Cart", "Website Adds to Cart", "网站加购", "Adds to Cart", "Total Adds to Cart", "Cart"], 
+        "initiate_checkout": ["结账发起次数", "结账", "Initiate Checkout", "Website Initiated Checkouts", "网站结账发起", "Checkouts"],
         "rate_click_to_lp": ["点击-落地页浏览转化率"],
         "rate_lp_to_atc": ["落地页浏览-加购转化率"],
         "rate_atc_to_ic": ["加购-结账转化率"],
@@ -45,14 +45,10 @@ SHEET_MAPPINGS = {
     },
     "分时段数据": {
         **COMMON_METRICS,
-        "date_range": ["时间范围", "Day", "Date"],
+        "date_range": ["时间范围", "Day", "Date", "Reporting Starts"],
         "landing_page_views": ["落地页浏览量", "Landing Page Views"],
         "add_to_cart": ["加入购物车", "加购", "Add to Cart", "Website Adds to Cart"],
         "initiate_checkout": ["结账发起次数", "Initiate Checkout"],
-        "rate_click_to_lp": ["点击-落地页浏览转化率"],
-        "rate_lp_to_atc": ["落地页浏览-加购转化率"],
-        "rate_atc_to_ic": ["加购-结账转化率"],
-        "rate_ic_to_pur": ["结账-购买转化率"]
     },
     "异常指标": {
         "anomaly_metric_name": ["异常指标"],
@@ -120,13 +116,13 @@ FIELD_ALIASES = {
     "clicks": ["clicks", "clicks (all)", "点击量", "clicks_all"],
     "impressions": ["impressions", "展示", "展现"],
     "ctr_all": ["ctr_all", "ctr (all)", "点击率 (all)"],
-    "add_to_cart": ["add_to_cart", "加入购物车", "加购", "cart", "website adds to cart"], # 增加 alias
+    "add_to_cart": ["add_to_cart", "加入购物车", "加购", "cart", "website adds to cart"],
     "initiate_checkout": ["initiate_checkout", "结账发起次数", "结账", "checkout"],
     "landing_page_views": ["landing_page_views", "落地页浏览量", "落地页", "landing"]
 }
 
 # ==========================================
-# PART 2: 核心工具函数 (保持不变，略微优化 safe_div)
+# PART 2: 核心工具函数 (保持一致)
 # ==========================================
 
 def parse_float(value):
@@ -151,7 +147,7 @@ def clean_numeric(val):
         try: return float(val_str) / 100.0 
         except: return 0.0
     try: return float(val_str)
-    except: return val # Return original if not number (for text columns)
+    except: return val 
 
 def clean_numeric_strict(val): 
     if pd.isna(val): return 0.0
@@ -186,7 +182,6 @@ def calc_metrics_dict(df_chunk):
     res = {}
     if df_chunk.empty: return res
     sums = {}
-    # 确保这里包含 add_to_cart
     targets = ['spend', 'clicks', 'impressions', 'purchases', 'purchase_value',
                'landing_page_views', 'add_to_cart', 'initiate_checkout']
     
@@ -332,7 +327,7 @@ def add_df_to_word(doc, df, title, level=1):
     doc.add_paragraph("\n")
 
 # ==========================================
-# PART 3: 主逻辑类 (Process ETL 修改重点)
+# PART 3: 主逻辑类 (ETL 强力修复版)
 # ==========================================
 
 class AdReportProcessor:
@@ -343,6 +338,8 @@ class AdReportProcessor:
         self.merged_dfs = {}
         self.final_json = {}
         self.doc = Document()
+        # 用于前端显示的调试信息
+        self.debug_info = []
 
     def find_sheet_fuzzy(self, target, actual_sheets):
         for actual in actual_sheets:
@@ -361,46 +358,57 @@ class AdReportProcessor:
             
             if actual_sheet_name:
                 df = pd.read_excel(xls, sheet_name=actual_sheet_name)
-                # 归一化列名，方便匹配
+                # 记录原始列名用于调试
+                if config_sheet_name == "整体数据":
+                    self.debug_info.append(f"【整体数据】Sheet 识别为: {actual_sheet_name}")
+                    self.debug_info.append(f"包含的列名: {list(df.columns)}")
+
                 df.columns = [str(c).strip() for c in df.columns]
                 
                 final_cols = {}
-                # ✅ 修正逻辑：更稳健的列匹配
                 for std_col, raw_col_options in mapping.items():
                     matched_col = None
-                    # 1. 精确/Case-Insensitive 匹配
+                    # 1. 列表里的别名匹配
                     for option in raw_col_options:
-                        # 查找原始列中是否存在该别名 (忽略大小写)
                         for raw_col in df.columns:
                             if option.lower() == raw_col.lower():
-                                matched_col = raw_col
-                                break
-                        if matched_col: break
-                        
-                        # 如果还没找到，尝试去空格匹配
+                                matched_col = raw_col; break
                         if not matched_col:
                             for raw_col in df.columns:
                                 if option.lower().replace(" ", "") == raw_col.lower().replace(" ", ""):
-                                    matched_col = raw_col
-                                    break
+                                    matched_col = raw_col; break
                         if matched_col: break
-                    
-                    if matched_col: 
-                        final_cols[std_col] = matched_col
+                    if matched_col: final_cols[std_col] = matched_col
+
+                # ✅ 强力补丁：如果常规匹配没找到 add_to_cart，启动“超级关键词”匹配
+                if "add_to_cart" not in final_cols:
+                    for raw_col in df.columns:
+                        c_low = raw_col.lower()
+                        # 只要列名同时包含 'cart' 和 'add'，或者包含中文'加购'
+                        if (("cart" in c_low and "add" in c_low) or "加购" in c_low or "购物车" in c_low) and "cost" not in c_low:
+                            final_cols["add_to_cart"] = raw_col
+                            if config_sheet_name == "整体数据":
+                                self.debug_info.append(f"⚠️ 触发强力匹配: 将 '{raw_col}' 识别为 '加购'")
+                            break
                 
+                if "initiate_checkout" not in final_cols:
+                    for raw_col in df.columns:
+                        c_low = raw_col.lower()
+                        if (("checkout" in c_low and "init" in c_low) or "结账" in c_low) and "cost" not in c_low:
+                            final_cols["initiate_checkout"] = raw_col
+                            break
+
                 # 创建清洗后的 DataFrame
                 if final_cols:
                     df_clean = df[list(final_cols.values())].rename(columns={v: k for k, v in final_cols.items()})
                 else:
-                    df_clean = pd.DataFrame() # 如果完全没匹配到
+                    df_clean = pd.DataFrame()
                 
-                # ✅ 核心修正：强制补全缺失的标准列，确保后续逻辑能找到 add_to_cart
+                # 强制补全列
                 for expected_col in mapping.keys():
                     if expected_col not in df_clean.columns:
-                        # 如果源文件中没找到这列，就创建它并填0
                         df_clean[expected_col] = 0.0
 
-                # 数值清洗
                 text_cols = ['date_range', 'anomaly_metric_name', 
                              'converting_keywords', 'converting_countries', 'converting_genders', 'converting_ages', 
                              'custom_audience_settings', 'dimension_item', 'content_item']
@@ -452,36 +460,30 @@ class AdReportProcessor:
                     df_clean = df_ov.dropna(subset=['temp_date']).sort_values('temp_date')
                     dates = df_clean['temp_date'].unique()
                     
-                    # 1.1 基于分时数据的基础计算
                     raw_overall = calc_metrics_dict(df_clean)
                     
-                    # ======================================================
-                    # ✅ [核心逻辑修正] 覆盖数据逻辑增强
-                    # ======================================================
+                    # ✅ 覆盖数据逻辑
                     if "Master_Overview" in self.merged_dfs:
                          df_all = self.merged_dfs["Master_Overview"]
                          mask_summary = df_all['Source_Sheet'] == "整体数据"
                          df_summary = df_all[mask_summary]
                          
                          if not df_summary.empty:
+                             # 尝试获取第一行有效数据
                              summary_row = df_summary.iloc[0]
                              override_metrics = ['add_to_cart', 'initiate_checkout', 'purchases', 'landing_page_views', 'impressions', 'clicks']
                              
                              for m in override_metrics:
-                                 # 只要列存在，就尝试读取
                                  if m in summary_row:
                                      val = clean_numeric_strict(summary_row[m])
-                                     # 只有值大于0才覆盖，防止坏数据
                                      if val > 0:
                                          raw_overall[m] = val
                              
-                             # 🚨 重新计算转化率 (因为分子分母变了)
                              raw_overall['rate_click_to_lp'] = safe_div(raw_overall.get('landing_page_views'), raw_overall.get('clicks'))
                              raw_overall['rate_lp_to_atc']   = safe_div(raw_overall.get('add_to_cart'), raw_overall.get('landing_page_views'))
                              raw_overall['rate_atc_to_ic']   = safe_div(raw_overall.get('initiate_checkout'), raw_overall.get('add_to_cart'))
                              raw_overall['rate_ic_to_pur']   = safe_div(raw_overall.get('purchases'), raw_overall.get('initiate_checkout'))
                              raw_overall['cvr_purchase'] = safe_div(raw_overall.get('purchases'), raw_overall.get('clicks'))
-                    # ======================================================
 
                     if len(dates) >= 2:
                         mid_date = dates[len(dates)//2]
@@ -533,16 +535,12 @@ class AdReportProcessor:
                     self.final_json['2_industry_benchmark'] = df_b.to_dict(orient='records')
                 except Exception as e: st.warning(f"大盘计算警告: {e}")
 
-        # 3. 受众组 (代码逻辑保持原样，略去不展示以节省空间，功能无影响)
+        # 其余生成函数
         self.generate_audience_section()
-        # 4. 素材与落地页
         self.generate_creative_section()
-        # 5. 版位
         self.generate_placement_section()
-        # 7. 架构诊断
         self.generate_structure_section()
 
-    # (为了简洁，我将后续未变动的函数折叠在类方法中，你可直接保留原有的后续逻辑)
     def generate_audience_section(self):
         self.doc.add_heading("3. 受众组分析", level=1)
         self.final_json['3_audience_analysis'] = {}
@@ -567,12 +565,10 @@ class AdReportProcessor:
                 mask = df_cr['Source_Sheet'].astype(str).apply(lambda x: any(k in x for k in keywords))
                 df_curr = df_cr[mask].copy()
                 if not df_curr.empty:
-                     # 简单的CPC/CTR补全逻辑，同原代码
                      if not find_column_fuzzy(df_curr, ['cpc']): df_curr['cpc'] = df_curr['spend'] / df_curr['clicks'].replace(0, np.nan) if 'clicks' in df_curr else 0
                      if not find_column_fuzzy(df_curr, ['cpa']): df_curr['cpa'] = df_curr['spend'] / df_curr['purchases'].replace(0, np.nan) if 'purchases' in df_curr else 0
                      if not find_column_fuzzy(df_curr, ['ctr']): df_curr['ctr'] = (df_curr['clicks'] / df_curr['impressions'].replace(0, np.nan)) * 100 if 'impressions' in df_curr else 0
                      else: df_curr['ctr'] = df_curr['ctr'] * 100
-                     
                      req_cols = ["content_item", "spend", "ctr", "cpc", "cpm", "roas", "cpa"]
                      df_final = self.standardize_cols(df_curr, req_cols)
                      if 'spend' in df_final.columns: df_final = df_final.sort_values('spend', ascending=False).head(10)
@@ -588,9 +584,7 @@ class AdReportProcessor:
              df_curr = df_bd[mask].copy()
              if not df_curr.empty:
                   req_cols = ['dimension_item', 'spend', 'ctr', 'cpc', 'cpm', 'roas', 'cpa']
-                  # 简单补全计算
                   if 'clicks' in df_curr and 'impressions' in df_curr: df_curr['ctr'] = df_curr['clicks'] / df_curr['impressions'].replace(0,np.nan)
-                  
                   df_clean = self.standardize_cols(df_curr, req_cols).round(2)
                   df_top5 = df_clean.sort_values('spend', ascending=False).head(5)
                   add_df_to_word(self.doc, apply_report_labels(df_top5, {'dimension_item': '版位'}), "5.1 版位花费 TOP 5", level=2)
@@ -625,7 +619,7 @@ class AdReportProcessor:
         self.final_json[json_section][title] = df_display.to_dict(orient='records')
 
 # ==========================================
-# PART 4: Streamlit UI (保持不变)
+# PART 4: Streamlit UI
 # ==========================================
 def main():
     st.set_page_config(page_title="Auto-ad-data", layout="wide")
@@ -640,15 +634,28 @@ def main():
             with st.spinner("数据处理中..."):
                 processor.process_etl()
                 processor.generate_report()
+            
+            # ✅ 新增：调试信息显示区域
+            if processor.debug_info:
+                with st.expander("🔍 调试信息 (如果数据仍为0，请截图此区域)", expanded=True):
+                    for info in processor.debug_info:
+                        st.text(info)
+
             st.success("处理完成！")
             
-            # 下载按钮逻辑
+            # 下载逻辑
             json_str = json.dumps(processor.final_json, indent=4, ensure_ascii=False)
             st.download_button("📥 下载 JSON", json_str, "report.json", "application/json")
             
             output_doc = io.BytesIO()
             processor.doc.save(output_doc)
             st.download_button("📥 下载 Word", output_doc.getvalue(), "report.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+            output_xls = io.BytesIO()
+            with pd.ExcelWriter(output_xls, engine='xlsxwriter') as writer:
+                for name, df in processor.merged_dfs.items():
+                    df.to_excel(writer, sheet_name=name, index=False)
+            st.download_button("📥 下载 Excel", output_xls.getvalue(), "merged_data.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             
         except Exception as e:
             st.error(f"发生错误: {str(e)}")
