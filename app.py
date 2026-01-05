@@ -30,7 +30,6 @@ COMMON_METRICS = {
 }
 
 # 框定「每一个 Sheet」需要抽取哪些指标
-# ✅ 修复：在"受众组"中增加了 converting_countries/genders/ages 映射
 SHEET_MAPPINGS = {
     "整体数据": {
         **COMMON_METRICS,
@@ -65,7 +64,6 @@ SHEET_MAPPINGS = {
         "dimension_item": ["广告组", "广告组Id", "Ad Set Name"],
         "custom_audience_settings": ["设置的自定义受众", "Custom Audiences"],
         "converting_keywords": ["产生成效的关键词", "Interests", "Keywords"],
-        # ✅ 新增以下三行，确保从Excel中读取这些列
         "converting_countries": ["产生成效的国家", "国家", "地区", "Country", "Region", "Location"],
         "converting_genders": ["产生成效的性别", "性别", "Gender"],
         "converting_ages": ["产生成效的年龄", "年龄", "Age", "Age Group"]
@@ -109,7 +107,7 @@ REPORT_MAPPING = {
     "converting_countries": "产生成效的国家", "converting_genders": "产生成效的性别", "converting_ages": "产生成效的年龄"
 }
 
-# ✅ 增强了模糊匹配别名
+# ✅ 增强了模糊匹配别名 (修复核心：增加了add_to_cart等字段的映射)
 FIELD_ALIASES = {
     "adset_id": ["adset_id", "ad set id", "adset id", "广告组编号", "广告组id", "adset_name", "ad set name"],
     "converting_countries": ["converting_countries", "country", "region", "国家", "地区", "location"],
@@ -122,7 +120,11 @@ FIELD_ALIASES = {
     "purchase_value": ["purchase_value", "conversion value", "value", "总价值", "gmv", "购买总价值"],
     "clicks": ["clicks", "clicks (all)", "点击量", "clicks_all"],
     "impressions": ["impressions", "展示", "展现"],
-    "ctr_all": ["ctr_all", "ctr (all)", "点击率 (all)"]
+    "ctr_all": ["ctr_all", "ctr (all)", "点击率 (all)"],
+    # ✅ 修复位置：新增以下三行映射，确保计算函数能找到中文列名
+    "add_to_cart": ["add_to_cart", "加入购物车", "加购", "cart"],
+    "initiate_checkout": ["initiate_checkout", "结账发起次数", "结账", "checkout"],
+    "landing_page_views": ["landing_page_views", "落地页浏览量", "落地页", "landing"]
 }
 
 
@@ -135,10 +137,8 @@ def parse_float(value):
     if value is None:
         return 0.0
     try:
-        # 如果已经是数字，直接返回
         if isinstance(value, (int, float)):
             return float(value)
-        # 如果是字符串，调用 clean_numeric_strict 进行标准处理
         return clean_numeric_strict(value)
     except (ValueError, TypeError):
         return 0.0
@@ -151,39 +151,28 @@ def safe_div(numerator, denominator, multiplier=1.0):
     else:
         return 0.0
 
-# 宽松清洗（用于展示）
 def clean_numeric(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
     val_str = str(val).strip().replace('$', '').replace('¥', '').replace(',', '')
-    
-    # ✅ 修复点 1：如果是百分数字符串，转换后除以 100
     if '%' in val_str: 
         val_str = val_str.replace('%', '')
         try: return float(val_str) / 100.0 
         except: return 0.0
-        
     try: return float(val_str)
     except: return val
 
-# 严格清洗（用于计算）
 def clean_numeric_strict(val): 
     if pd.isna(val): return 0.0
-    # 如果已经是数字，直接返回
     if isinstance(val, (int, float)): return float(val)
-    
     val_str = str(val).strip().replace('$', '').replace('¥', '').replace(',', '')
-    
-    # ✅ 修复点 2：如果是百分数字符串（如 "2.31%"），去除%后除以100还原为小数（0.0231）
     if '%' in val_str: 
         val_str = val_str.replace('%', '')
         try: return float(val_str) / 100.0
         except: return 0.0
-        
     try: return float(val_str)
     except: return 0.0
 
-# 字段鲁棒核心
 def find_column_fuzzy(df, keywords):
     for kw in keywords:
         if kw in df.columns: return kw
@@ -197,7 +186,6 @@ def find_column_fuzzy(df, keywords):
             if kw.lower() in col_lower: return col
     return None
 
-# 核心指标计算
 def calc_metrics_dict(df_chunk):
     res = {}
     if df_chunk.empty: return res
@@ -219,6 +207,7 @@ def calc_metrics_dict(df_chunk):
     res['clicks'] = parse_float(sums.get('clicks', 0))
     res['purchases'] = parse_float(sums.get('purchases', 0))
     res['purchase_value'] = parse_float(sums.get('purchase_value', 0))
+    res['add_to_cart'] = parse_float(sums.get('add_to_cart', 0)) # ✅ 确保写入结果
     res['roas'] = safe_div(sums.get('purchase_value'), sums.get('spend'))
     res['cpm'] = safe_div(sums.get('spend'), sums.get('impressions'), multiplier=1000)
     res['cpc'] = safe_div(sums.get('spend'), sums.get('clicks'))
@@ -249,7 +238,6 @@ def format_cell(key, val, is_mom=False):
     k = str(key).lower()
     if 'roas' in k: return f"{val:.2f}"
     if any(x in k for x in ['rate', 'ctr', 'cvr', '点击率', '转化率', '着陆率', '意向率', '成功率']): 
-        # 这里会乘以100，所以输入必须是小数 (0.0231 -> 2.31%)
         return f"{val:.2%}" 
     if any(x in k for x in ['spend', 'cpm', 'cpc', 'value', 'aov', 'cpa', '花费', '金额', '客单价', 'gmv', '价值']): return f"{val:,.2f}"
     if any(x in k for x in ['purchases', 'cart', 'click', '次数', '单量', '点击', '展现', '访问量', '发起数']): return f"{val:,.0f}"
@@ -267,13 +255,8 @@ def extract_benchmark_values(df_bench):
             try:
                 s = df_bench[found_col].apply(clean_numeric_strict)
                 v = s[s>0].mean()
-                
-                # ✅ 修复点 3：防御性逻辑
-                # 如果是 CTR/CVR 等比率类指标，且基准值 > 1.0 (例如用户填了 2.31 而不是 0.0231)，
-                # 且该列不是 CPA/CPM/ROAS/CPC 这种本身就很大的值，则强制除以100
                 if metric in ['ctr'] and v > 1.0:
                     v = v / 100.0
-                    
                 if not pd.isna(v): extracted[metric] = [v, higher_better]
             except: pass
     return extracted
@@ -348,7 +331,7 @@ def add_df_to_word(doc, df, title, level=1):
     doc.add_paragraph("\n")
 
 # ==========================================
-# PART 3: 主逻辑类 (Process ETL 中包含了关键修复)
+# PART 3: 主逻辑类
 # ==========================================
 
 class AdReportProcessor:
@@ -360,14 +343,12 @@ class AdReportProcessor:
         self.final_json = {}
         self.doc = Document()
 
-    # --- 阶段 1: 数据清洗与降维 ---
     def process_etl(self):
         xls = pd.ExcelFile(self.raw_file)
         for sheet_name, mapping in SHEET_MAPPINGS.items():
             if sheet_name in xls.sheet_names:
                 df = pd.read_excel(xls, sheet_name=sheet_name)
                 final_cols = {}
-                # 字段映射
                 for std_col, raw_col_options in mapping.items():
                     matched_col = None
                     for option in raw_col_options:
@@ -380,8 +361,6 @@ class AdReportProcessor:
 
                 if final_cols:
                     df_clean = df[list(final_cols.values())].rename(columns={v: k for k, v in final_cols.items()})
-                    
-                    # ✅ 修复重点：将 converting_countries 等列加入「不进行数字清洗」的白名单
                     text_cols = ['date_range', 'anomaly_metric_name', 
                                  'converting_keywords', 'converting_countries', 'converting_genders', 'converting_ages', 
                                  'custom_audience_settings', 'dimension_item', 'content_item']
@@ -397,7 +376,6 @@ class AdReportProcessor:
                     df_clean["Source_Sheet"] = sheet_name
                     self.processed_dfs[sheet_name] = df_clean
 
-        # 合并 Master Tables
         for master_name, source_sheets in GROUP_CONFIG.items():
             dfs_to_merge = [self.processed_dfs[src] for src in source_sheets if src in self.processed_dfs]
             if dfs_to_merge:
@@ -408,7 +386,6 @@ class AdReportProcessor:
                 new_order = [c for c in priority_cols if c in cols] + [c for c in cols if c not in priority_cols]
                 self.merged_dfs[master_name] = merged_df[new_order]
 
-    # --- 阶段 2: 报告生成与架构诊断 ---
     def generate_report(self):
         benchmark_targets = {'roas': [2.0, True], 'cpm': [20.0, False], 'ctr': [0.015, True], 'cpc': [1.5, False], 'cpa': [30.0, False]}
         if self.bench_file:
@@ -461,8 +438,6 @@ class AdReportProcessor:
                     df_f = pd.DataFrame(final_data, columns=col_order)
                     df_f_display = apply_report_labels(df_f)
                     add_df_to_word(self.doc, df_f_display, "1. 数据大盘总览", level=1)
-                    
-                    # ✅ 修改: JSON 使用展示名 DataFrame
                     self.final_json['1_data_overview'] = df_f_display.to_dict(orient='records')
 
                     # 2. Benchmark
@@ -509,7 +484,6 @@ class AdReportProcessor:
                     if not find_column_fuzzy(df_curr, ['cpa']): df_curr['cpa'] = df_curr['spend'] / df_curr['purchases'].replace(0, np.nan) if 'purchases' in df_curr else 0
 
                     req_cols = ["dimension_item", "spend", "ctr", "cpc", "cpm", "cpa", "roas"]
-                    
                     if "受众" in title: req_cols += ["converting_countries", "converting_keywords", "converting_genders", "converting_ages"]
 
                     rename_map = {}; valid_cols = []
@@ -518,19 +492,14 @@ class AdReportProcessor:
                         found = find_column_fuzzy(df_curr, aliases)
                         if found: valid_cols.append(found); rename_map[found] = req
                         else: 
-                            # 对于文本字段，给 "-" 而不是 0.0
                             default_val = "-" if "converting" in req else 0.0
                             df_curr[req] = default_val; valid_cols.append(req)
 
                     df_final = df_curr[valid_cols].rename(columns=rename_map)
                     
-                    # =======================================================
-                    # ✅ 修复异常值：显式填充 NaN 为 "-"
-                    # =======================================================
                     text_columns_to_fix = ["converting_countries", "converting_keywords", "converting_genders", "converting_ages"]
                     for t_col in text_columns_to_fix:
                         if t_col in df_final.columns:
-                            # 将 NaN 填充为 "-"，同时防止出现字符串 "nan"
                             df_final[t_col] = df_final[t_col].fillna("-").astype(str).replace("nan", "-")
                             
                     if "dimension_item" in df_final.columns:
@@ -540,8 +509,6 @@ class AdReportProcessor:
                     df_clean = df_final.round(2)
                     df_display = apply_report_labels(df_clean, custom_mapping={'dimension_item': dim_label})
                     add_df_to_word(self.doc, df_display, title, level=2)
-                    
-                    # ✅ 修改: JSON 使用展示名 DataFrame
                     self.final_json['3_audience_analysis'][title] = df_display.to_dict(orient='records')
 
         # 4. 素材与落地页
@@ -574,8 +541,6 @@ class AdReportProcessor:
                     
                     df_display = apply_report_labels(df_clean, custom_mapping={'content_item': label})
                     add_df_to_word(self.doc, df_display, title, level=1)
-                    
-                    # ✅ 修改: JSON 使用展示名 DataFrame
                     self.final_json[json_key] = df_display.to_dict(orient='records')
                     
         # 5. 版位
@@ -607,7 +572,6 @@ class AdReportProcessor:
                  if df_pot.empty: df_pot = df_clean.sort_values('ctr', ascending=False).head(5)
                  add_df_to_word(self.doc, apply_report_labels(df_pot, {'dimension_item': '版位'}), "5.2 版位高潜力", level=2)
                  
-                 # ✅ 修改: JSON 使用 apply_report_labels 处理后的 DataFrame
                  self.final_json['5_placement_analysis'] = {
                      "top_spend": apply_report_labels(df_top5, {'dimension_item': '版位'}).to_dict('records'),
                      "high_potential": apply_report_labels(df_pot, {'dimension_item': '版位'}).to_dict('records')
@@ -652,67 +616,50 @@ class AdReportProcessor:
 # ==========================================
 # PART 4: Streamlit UI
 # ==========================================
-# ⚠️ 注意：已删除原有的 Mock Class (模拟类)，
-# 这样 main() 函数就会调用 PART 3 中定义的真实的 AdReportProcessor。
-# -------------------------------------------------------------------
 
 def main():
     st.set_page_config(page_title="Auto-ad-data", layout="wide")
 
-    # --- CSS Styles ---
     st.markdown("""
         <style>
-        /* 0. Global Background (Aurora Effect) */
         .stApp {
-            /* 柔和的极光背景：中心是暖黄色，向外扩散为柔和的粉紫色，最后融入白色背景 */
             background: radial-gradient(circle at 50% 20%, rgba(255, 240, 200, 0.6) 0%, rgba(240, 200, 255, 0.4) 30%, rgba(255, 255, 255, 1) 70%);
             background-attachment: fixed;
             background-size: cover;
         }
-        
-        /* 1. Main Title Style (Gradient) */
         .main-title {
             text-align: center;
             font-size: 3.5rem;
             font-weight: 800;
             margin-bottom: 0.5rem;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            
-            /* Gradient Text Effect - Purple to Pink */
             background: linear-gradient(135deg, #662D8C 0%, #ED1E79 100%);
             background: -webkit-linear-gradient(135deg, #662D8C 0%, #ED1E79 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
-        /* 2. Subtitle Description */
         .sub-title {
             text-align: center;
             font-size: 1.1rem;
-            color: #666; /* Slightly darker for better readability */
+            color: #666;
             margin-bottom: 3rem;
         }
-
-        /* --- NEW: High-End Glassmorphism Card Style (Outer Containers) --- */
         [data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(255, 255, 255, 0.45) !important; /* Milky transparent white */
-            backdrop-filter: blur(14px); /* Blur effect for "Glass" look */
+            background: rgba(255, 255, 255, 0.45) !important;
+            backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border: 1px solid rgba(255, 255, 255, 0.8) !important;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); /* Soft shadow */
-            border-radius: 24px !important; /* Smooth rounded corners */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            border-radius: 24px !important;
             padding: 1rem;
             transition: all 0.3s ease;
         }
-
         [data-testid="stVerticalBlockBorderWrapper"]:hover {
             transform: translateY(-3px);
             box-shadow: 0 15px 35px rgba(102, 45, 140, 0.1);
             border-color: rgba(237, 30, 121, 0.2) !important;
             background: rgba(255, 255, 255, 0.65) !important;
         }
-
-        /* 3. Card Headers & Icons */
         .card-header {
             text-align: center;
             font-weight: 600;
@@ -720,58 +667,45 @@ def main():
             margin-bottom: 0.5rem;
             letter-spacing: 0.5px;
         }
-        
         .icon-container {
             text-align: center;
             font-size: 2.5rem;
             margin-bottom: 5px;
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
         }
-
-        /* --- Customizing the Streamlit File Uploader (Target 1: Uploader Box) --- */
-        /* Enhanced Glass Effect for File Upload Area */
         [data-testid='stFileUploader'] section {
-            background-color: rgba(255, 255, 255, 0.25); /* Semi-transparent */
-            backdrop-filter: blur(15px); /* Strong blur */
+            background-color: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(15px);
             -webkit-backdrop-filter: blur(15px);
-            border: 1.5px dashed rgba(102, 45, 140, 0.3); /* Purple dashed border */
-            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.5); /* Inner glow */
+            border: 1.5px dashed rgba(102, 45, 140, 0.3);
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.5);
             border-radius: 16px;
-            padding: 1.5rem; /* More spacing */
+            padding: 1.5rem;
             transition: all 0.3s ease;
         }
-        
         [data-testid='stFileUploader'] section:hover {
             background-color: rgba(255, 255, 255, 0.5);
-            border-color: #ED1E79; /* Pink hover border */
-            box-shadow: 0 8px 20px rgba(102, 45, 140, 0.15); /* Outer shadow on hover */
+            border-color: #ED1E79;
+            box-shadow: 0 8px 20px rgba(102, 45, 140, 0.15);
         }
-        
         [data-testid='stFileUploader'] button {
             border-radius: 20px;
             border-color: rgba(102, 45, 140, 0.2);
             color: #662D8C;
             background-color: rgba(255, 255, 255, 0.8);
         }
-
-        /* --- Target 2: Suggestion/Info Box Style --- */
         .glass-info-box {
             padding: 1rem 1.5rem;
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
             border-radius: 16px;
-            
-            /* Glassmorphism Props */
-            background: rgba(255, 255, 255, 0.3); /* Transparent white */
-            backdrop-filter: blur(15px); /* Strong blur */
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(15px);
             -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.7); /* Shiny glass edge */
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); /* Subtle depth */
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
         }
-
-        /* 4. MAIN ACTION BUTTON: High Contrast Gradient (Purple -> Cyan) */
-        /* Only targets the Start button */
         div.stButton > button {
             display: block;
             margin: 0 auto;
@@ -791,44 +725,30 @@ def main():
             transform: translateY(-3px) scale(1.02);
             box-shadow: 0 10px 30px rgba(33, 212, 253, 0.5);
         }
-        
-        /* 5. DOWNLOAD BUTTONS: 3D Light Gradient Style */
-        /* Targets the 3 download buttons */
         div.stDownloadButton > button {
             display: block;
             margin: 0 auto;
             width: 100%;
-            
-            /* Light 3D Gradient - Subtle Purple/White */
             background: linear-gradient(145deg, rgba(255, 255, 255, 1) 0%, rgba(245, 235, 255, 1) 100%);
-            
-            /* Dark Purple Text for contrast on light bg */
             color: #662D8C !important; 
-            
             border-radius: 30px;
             padding: 0.7rem 1.5rem;
             font-size: 1rem;
             font-weight: 700;
-            
-            /* 3D Effects */
             border: 1px solid rgba(255, 255, 255, 0.8);
             box-shadow: 
-                0 4px 10px rgba(102, 45, 140, 0.08), /* Soft drop shadow */
-                inset 0 1px 0 rgba(255, 255, 255, 0.9), /* Top highlight */
-                inset 0 -2px 0 rgba(0, 0, 0, 0.03); /* Subtle bottom bevel */
-            
+                0 4px 10px rgba(102, 45, 140, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.03);
             transition: all 0.2s ease;
         }
-        
         div.stDownloadButton > button:hover {
             transform: translateY(-2px);
-            /* Slightly brighter/more purple on hover */
             background: linear-gradient(145deg, #ffffff 0%, #f0e6ff 100%);
-            border-color: #ED1E79; /* Pinkish border on hover */
+            border-color: #ED1E79;
             box-shadow: 0 8px 15px rgba(102, 45, 140, 0.15);
             color: #ED1E79 !important;
         }
-        
         div[data-baseweb="notification"] {
             background-color: rgba(102, 45, 140, 0.05);
             border-left-color: #662D8C;
@@ -837,18 +757,15 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
-    # --- Header Section ---
     st.markdown('<div class="main-title">What can I help with?</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="sub-title">请分别上传您的【周期性复盘报告】、【行业benchmark】数据文件，我将为您生成专业准确的广告优化【数据终表】。</div>', 
         unsafe_allow_html=True
     )
 
-    # --- File Upload Section (Cards) ---
     col1, col_gap, col2 = st.columns([1, 0.1, 1])
 
     with col1:
-        # Use container with border to mimic the card look
         with st.container(border=True):
             st.markdown('<div class="icon-container">📊</div>', unsafe_allow_html=True)
             st.markdown('<div class="card-header">1.上传【周期性复盘报告】</div>', unsafe_allow_html=True)
@@ -860,15 +777,13 @@ def main():
             st.markdown('<div class="card-header">2.上传【行业 Benchmark]】</div>', unsafe_allow_html=True)
             bench_file = st.file_uploader("", type=["xlsx", "xls"], key="bench_uploader", label_visibility="collapsed")
 
-    st.write("") # Spacer
-    st.write("") # Spacer
+    st.write("")
+    st.write("")
 
-    # --- Action Button (Centered) ---
     b_c1, b_c2, b_c3 = st.columns([1, 1, 1])
     with b_c2:
         start_btn = st.button("开始生成数据表 ✦", use_container_width=True)
 
-    # --- Logic ---
     if start_btn:
         if not raw_file:
             st.error("⚠️ 请至少上传 [数据报表] 才能继续！")
@@ -893,11 +808,9 @@ def main():
             
             st.balloons() 
             
-            # --- Results Area ---
             st.markdown("### 📥 下载结果文件")
             
             with st.container(border=True):
-                # REPLACED INLINE STYLE WITH CLASS '.glass-info-box'
                 st.markdown("""
                     <div class="glass-info-box">
                         <span style="font-size: 1.2rem; margin-right: 0.8rem;">💡</span>
@@ -915,7 +828,6 @@ def main():
 
                 res_c1, res_c2, res_c3 = st.columns(3)
 
-                # 1. JSON
                 json_str = json.dumps(processor.final_json, indent=4, ensure_ascii=False)
                 res_c1.download_button(
                     "📥 JSON (大模型分析)", 
@@ -925,7 +837,6 @@ def main():
                     use_container_width=True
                 )
 
-                # 2. Excel
                 output_xls = io.BytesIO()
                 with pd.ExcelWriter(output_xls, engine='xlsxwriter') as writer:
                     for name, df in processor.merged_dfs.items(): 
@@ -938,7 +849,6 @@ def main():
                     use_container_width=True
                 )
 
-                # 3. Word
                 output_doc = io.BytesIO()
                 processor.doc.save(output_doc)
                 res_c3.download_button(
