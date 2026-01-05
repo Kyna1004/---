@@ -34,7 +34,7 @@ SHEET_MAPPINGS = {
         **COMMON_METRICS,
         "date_range": ["时间范围"],
         "clicks_all": ["点击"],
-        "landing_page_views": ["落地页浏览量"],
+        "landing_page_views": ["落地页浏览量", "落地页"],
         "add_to_cart": ["加入购物车", "加购", "Add to Cart"], 
         "initiate_checkout": ["结账发起次数", "结账", "Initiate Checkout"],
         "rate_click_to_lp": ["点击-落地页浏览转化率"],
@@ -208,10 +208,13 @@ def calc_metrics_dict(df_chunk):
     res['ctr'] = safe_div(sums.get('clicks'), sums.get('impressions'))
     res['cpa'] = safe_div(sums.get('spend'), sums.get('purchases'))
     res['cvr_purchase'] = safe_div(sums.get('purchases'), sums.get('clicks'))
+    
+    # 这些转化率会在后续被【整体数据】覆盖修正，但这里先保留默认计算
     res['rate_click_to_lp'] = safe_div(sums.get('landing_page_views'), sums.get('clicks'))
     res['rate_lp_to_atc']   = safe_div(sums.get('add_to_cart'), sums.get('landing_page_views'))
     res['rate_atc_to_ic']   = safe_div(sums.get('initiate_checkout'), sums.get('add_to_cart'))
     res['rate_ic_to_pur']   = safe_div(sums.get('purchases'), sums.get('initiate_checkout'))
+    
     res['aov'] = safe_div(sums.get('purchase_value'), sums.get('purchases'))
 
     date_col = find_column_fuzzy(df_chunk, ['date', 'time', 'range'])
@@ -422,34 +425,38 @@ class AdReportProcessor:
                     df_clean = df_ov.dropna(subset=['temp_date']).sort_values('temp_date')
                     dates = df_clean['temp_date'].unique()
                     
-                    # 正常计算逻辑
+                    # 1.1 先根据分时数据计算基础值 (Sum)
                     raw_overall = calc_metrics_dict(df_clean)
                     
                     # ======================================================
-                    # ✅ [FIXED & ROBUST] 强制使用【整体数据】Sheet 中的值覆盖计算值
+                    # ✅ [核心逻辑修正] 强制使用【整体数据】Sheet 中的值覆盖漏斗指标
                     # ======================================================
                     if "Master_Overview" in self.merged_dfs:
                          df_all = self.merged_dfs["Master_Overview"]
-                         # 因为在 process_etl 中已经统一了 Source_Sheet 为标准名，这里可以直接匹配
+                         # 直接锁定 source_sheet 为 '整体数据' 的行
                          mask_summary = df_all['Source_Sheet'] == "整体数据"
                          df_summary = df_all[mask_summary]
                          
                          if not df_summary.empty:
-                             # 假设只有一行汇总数据，取第一行
+                             # 假设第一行即为汇总行
                              summary_row = df_summary.iloc[0]
                              
-                             # 尝试直接读取这些关键指标，如果有值且大于0，则覆盖 raw_overall
-                             direct_metrics = ['add_to_cart', 'initiate_checkout', 'purchases', 'landing_page_views']
-                             for m in direct_metrics:
-                                 if m in summary_row:
+                             # 定义需要强制覆盖的指标 (漏斗相关)
+                             override_metrics = ['add_to_cart', 'initiate_checkout', 'purchases', 'landing_page_views']
+                             
+                             for m in override_metrics:
+                                 if m in summary_row and pd.notna(summary_row[m]):
                                      val = clean_numeric_strict(summary_row[m])
+                                     # 只有当值有效(>0)时才覆盖，避免 Excel 空白导致数据变为 0
                                      if val > 0:
                                          raw_overall[m] = val
                              
-                             # 重新计算依赖这些绝对值的转化率
+                             # 🚨 修正核心：覆盖绝对值后，必须重新计算转化率，否则比率会和新数值不匹配
                              raw_overall['rate_lp_to_atc'] = safe_div(raw_overall.get('add_to_cart', 0), raw_overall.get('landing_page_views', 0))
                              raw_overall['rate_atc_to_ic'] = safe_div(raw_overall.get('initiate_checkout', 0), raw_overall.get('add_to_cart', 0))
                              raw_overall['rate_ic_to_pur'] = safe_div(raw_overall.get('purchases', 0), raw_overall.get('initiate_checkout', 0))
+                             # CVR (Click to Purchase)
+                             raw_overall['cvr_purchase'] = safe_div(raw_overall.get('purchases', 0), raw_overall.get('clicks', 0))
                     # ======================================================
 
                     if len(dates) >= 2:
@@ -481,7 +488,7 @@ class AdReportProcessor:
                     self.final_json['1_data_overview'] = df_f_display.to_dict(orient='records')
 
                     # 2. Benchmark
-                    raw_current = calc_metrics_dict(df_clean)
+                    raw_current = raw_overall.copy() # 使用已经修正过的数据进行 Benchmark 对比
                     bench_data = []
                     for metric_key in ['roas', 'cpm', 'ctr', 'cpc', 'cpa']:
                         curr_val = raw_current.get(metric_key, 0)
